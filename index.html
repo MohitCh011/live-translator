@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LiveTranslate - Real-time Teaching Subtitles</title>
-    <script src="https://cdn.jsdelivr.net/npm/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -391,6 +391,33 @@
             border: 1px solid #ff4757;
         }
 
+        .debug-console {
+            background: rgba(10, 10, 15, 0.95);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 10px;
+            padding: 10px 15px;
+            margin-top: 15px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.75rem;
+            max-height: 120px;
+            overflow-y: auto;
+            text-align: left;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
+        }
+
+        .debug-title {
+            color: #00d4ff;
+            font-weight: bold;
+            margin-bottom: 5px;
+            border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+            padding-bottom: 3px;
+        }
+
+        .debug-logs {
+            color: #39ff14;
+            line-height: 1.4;
+        }
+
         @media (max-width: 968px) {
             .main-interface {
                 grid-template-columns: 1fr;
@@ -435,6 +462,11 @@
                             Translation will appear here
                         </div>
                     </div>
+                </div>
+
+                <div id="teacherDebugConsole" class="debug-console">
+                    <div class="debug-title">System Debug Logs:</div>
+                    <div id="teacherDebugLogs" class="debug-logs"></div>
                 </div>
 
                 <div class="controls">
@@ -538,6 +570,11 @@
                     </div>
                 </div>
 
+                <div id="studentDebugConsole" class="debug-console">
+                    <div class="debug-title">System Debug Logs:</div>
+                    <div id="studentDebugLogs" class="debug-logs"></div>
+                </div>
+
                 <div class="controls">
                     <button class="control-btn btn-primary" onclick="joinSession()">
                         <span>🔗</span> Join Session
@@ -626,6 +663,19 @@
         let peer = null;
         let peerConnections = [];
 
+        function logDebug(msg) {
+            console.log(msg);
+            const activeLogsId = currentMode === 'teacher' ? 'teacherDebugLogs' : 'studentDebugLogs';
+            const logsEl = document.getElementById(activeLogsId);
+            if (logsEl) {
+                const item = document.createElement('div');
+                item.style.marginBottom = '2px';
+                item.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+                logsEl.appendChild(item);
+                logsEl.scrollTop = logsEl.scrollHeight;
+            }
+        }
+
         function updateSubtitleDisplay(activeTranslation = '', isInterim = false) {
             const subtitleEl = document.getElementById('translatedText');
             let linesToShow = [...finalizedLines];
@@ -705,19 +755,21 @@
             sessionChannel = new BroadcastChannel(`livetranslate-session-${sessionId}`);
 
             if (role === 'teacher') {
-                peer = new Peer('lt-session-' + sessionId);
+                logDebug('Initializing Teacher PeerJS with ID: lt-session-' + sessionId);
+                peer = new Peer('lt-session-' + sessionId, { debug: 3 });
 
                 peer.on('open', (id) => {
-                    console.log('Teacher PeerJS registered with ID:', id);
+                    logDebug('Teacher PeerJS registration successful! ID: ' + id);
                     updateConnectionStatus(true);
                 });
 
                 peer.on('connection', (conn) => {
-                    console.log('Student connected to Teacher via PeerJS:', conn.peer);
+                    logDebug('Student connected via PeerJS: ' + conn.peer);
                     peerConnections.push(conn);
 
                     // Send current finalized history so student gets immediate catchup!
                     conn.on('open', () => {
+                        logDebug('WebRTC Data Channel open for peer: ' + conn.peer);
                         conn.send({
                             type: 'catchup',
                             finalizedLines: finalizedLines
@@ -725,17 +777,19 @@
                     });
 
                     conn.on('close', () => {
+                        logDebug('WebRTC Peer disconnected: ' + conn.peer);
                         peerConnections = peerConnections.filter(c => c !== conn);
                     });
                 });
 
                 peer.on('error', (err) => {
-                    console.error('Teacher PeerJS error:', err);
+                    logDebug('Teacher PeerJS Error: ' + err.type + ' - ' + err.message);
                 });
             }
 
             if (role === 'student') {
                 const handleReceivedMessage = (data) => {
+                    logDebug('Received sync packet: ' + data.type);
                     if (data.type === 'transcript') {
                         if (data.finalizedLines) {
                             studentFinalizedLines = [...data.finalizedLines];
@@ -766,14 +820,16 @@
                 };
 
                 // 2. Connect via PeerJS (Network/Mobile)
-                peer = new Peer();
+                logDebug('Initializing Student PeerJS connection...');
+                peer = new Peer({ debug: 3 });
                 peer.on('open', (id) => {
-                    console.log('Student PeerJS registered with ID:', id);
+                    logDebug('Student PeerJS registered with ID: ' + id);
+                    logDebug('Attempting WebRTC connection to Teacher: lt-session-' + sessionId);
                     const conn = peer.connect('lt-session-' + sessionId);
                     peerConnections.push(conn);
 
                     conn.on('open', () => {
-                        console.log('Student connected to Teacher session:', sessionId);
+                        logDebug('WebRTC connection established with Teacher!');
                         updateConnectionStatus(true);
                         document.getElementById('studentStatusText').textContent = 'Connected to session ' + sessionId;
                     });
@@ -783,13 +839,18 @@
                     });
 
                     conn.on('close', () => {
+                        logDebug('WebRTC connection closed by teacher.');
                         updateConnectionStatus(false);
                         document.getElementById('studentStatusText').textContent = 'Session ended by teacher';
+                    });
+
+                    conn.on('error', (err) => {
+                        logDebug('WebRTC Connection error: ' + err);
                     });
                 });
 
                 peer.on('error', (err) => {
-                    console.error('Student PeerJS error:', err);
+                    logDebug('Student PeerJS Error: ' + err.type + ' - ' + err.message);
                 });
             }
 
@@ -931,14 +992,20 @@
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
             if (!SpeechRecognition) {
+                logDebug('Error: Speech recognition not supported in this browser!');
                 alert('Speech recognition not supported in this browser. Please use Chrome.');
                 return;
             }
 
+            logDebug('Initializing Web Speech API. Lang: ' + document.getElementById('teacherLang').value);
             recognition = new SpeechRecognition();
             recognition.continuous = true;
             recognition.interimResults = true;
             recognition.lang = document.getElementById('teacherLang').value;
+
+            recognition.onstart = () => {
+                logDebug('Microphone listening started successfully.');
+            };
 
             recognition.onresult = async (event) => {
                 let finalTranscript = '';
@@ -957,11 +1024,13 @@
                 const detectedLang = document.getElementById('teacherLang').value.split('-')[0];
 
                 if (finalTranscript) {
+                    logDebug('Speech detected (Final): "' + finalTranscript + '"');
                     if (interimTranslationTimeout) {
                         clearTimeout(interimTranslationTimeout);
                     }
                     await processTranscript(finalTranscript);
                 } else if (interimTranscript) {
+                    logDebug('Speech detected (Interim): "' + interimTranscript + '"');
                     // Update interim translation on-the-fly
                     translateInterim(interimTranscript, detectedLang, targetLang, (translatedText) => {
                         updateSubtitleDisplay(translatedText, true);
@@ -978,7 +1047,7 @@
             };
 
             recognition.onerror = (event) => {
-                console.error('Speech recognition error:', event.error);
+                logDebug('Speech Recognition Error: ' + event.error);
                 document.getElementById('statusText').textContent = `Mic Status: Error (${event.error}). Reconnecting...`;
                 if (event.error === 'not-allowed') {
                     alert('Microphone access denied.');
@@ -986,11 +1055,13 @@
             };
 
             recognition.onend = () => {
+                logDebug('Speech Recognition engine ended.');
                 if (isTeaching) {
                     // Update language setting dynamically on restart
                     try {
                         recognition.lang = document.getElementById('teacherLang').value;
                         recognition.start(); // Restart if still teaching
+                        logDebug('Speech Recognition restarted.');
                         document.getElementById('statusText').textContent = 'Live - Students can join now';
                     } catch (e) {
                         console.warn("Failed to restart speech recognition immediately. Retrying in 200ms...", e);
@@ -998,8 +1069,10 @@
                             if (isTeaching) {
                                 try {
                                     recognition.start();
+                                    logDebug('Speech Recognition restarted (retry).');
                                     document.getElementById('statusText').textContent = 'Live - Students can join now';
                                 } catch (err) {
+                                    logDebug('Critical: Failed to restart Speech Recognition: ' + err.message);
                                     console.error("Failed to restart speech recognition on retry:", err);
                                     document.getElementById('statusText').textContent = 'Mic stopped. Click Stop and Start to reset.';
                                 }
@@ -1018,6 +1091,7 @@
             updateSubtitleDisplay("Translating...", true);
 
             try {
+                logDebug('Translating final text: "' + text.substring(0, 30) + '..."');
                 const translation = await translateText(
                     text,
                     detectedLang.split('-')[0],
