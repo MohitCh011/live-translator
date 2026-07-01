@@ -839,18 +839,29 @@
         // Start teaching
         async function startTeaching() {
             try {
-                // Get camera and microphone
-                localStream = await navigator.mediaDevices.getUserMedia({
-                    video: true,
-                    audio: {
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        sampleRate: 44100
-                    }
-                });
+                // Progressively request audio and video with safe constraints
+                try {
+                    localStream = await navigator.mediaDevices.getUserMedia({
+                        video: true,
+                        audio: true
+                    });
+                } catch (videoErr) {
+                    console.warn("Could not get video stream, falling back to audio-only...", videoErr);
+                    localStream = await navigator.mediaDevices.getUserMedia({
+                        video: false,
+                        audio: true
+                    });
+                    document.getElementById('teacherVideo').style.display = 'none';
+                }
 
                 const video = document.getElementById('teacherVideo');
-                video.srcObject = localStream;
+                if (localStream.getVideoTracks().length > 0) {
+                    video.srcObject = localStream;
+                    video.style.display = 'block';
+                } else {
+                    video.srcObject = null;
+                    video.style.display = 'none';
+                }
 
                 // Generate session
                 sessionId = document.getElementById('sessionCode').value;
