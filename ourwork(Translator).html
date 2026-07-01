@@ -391,32 +391,7 @@
             border: 1px solid #ff4757;
         }
 
-        .debug-console {
-            background: rgba(10, 10, 15, 0.95);
-            border: 1px solid rgba(0, 212, 255, 0.2);
-            border-radius: 10px;
-            padding: 10px 15px;
-            margin-top: 15px;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 0.75rem;
-            max-height: 120px;
-            overflow-y: auto;
-            text-align: left;
-            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
-        }
 
-        .debug-title {
-            color: #00d4ff;
-            font-weight: bold;
-            margin-bottom: 5px;
-            border-bottom: 1px solid rgba(0, 212, 255, 0.2);
-            padding-bottom: 3px;
-        }
-
-        .debug-logs {
-            color: #39ff14;
-            line-height: 1.4;
-        }
 
         @media (max-width: 968px) {
             .main-interface {
@@ -464,10 +439,7 @@
                     </div>
                 </div>
 
-                <div id="teacherDebugConsole" class="debug-console">
-                    <div class="debug-title">System Debug Logs:</div>
-                    <div id="teacherDebugLogs" class="debug-logs"></div>
-                </div>
+
 
                 <div class="controls">
                     <button class="control-btn btn-primary" id="startBtn" onclick="startTeaching()">
@@ -570,10 +542,7 @@
                     </div>
                 </div>
 
-                <div id="studentDebugConsole" class="debug-console">
-                    <div class="debug-title">System Debug Logs:</div>
-                    <div id="studentDebugLogs" class="debug-logs"></div>
-                </div>
+
 
                 <div class="controls">
                     <button class="control-btn btn-primary" onclick="joinSession()">
@@ -665,15 +634,6 @@
 
         function logDebug(msg) {
             console.log(msg);
-            const activeLogsId = currentMode === 'teacher' ? 'teacherDebugLogs' : 'studentDebugLogs';
-            const logsEl = document.getElementById(activeLogsId);
-            if (logsEl) {
-                const item = document.createElement('div');
-                item.style.marginBottom = '2px';
-                item.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-                logsEl.appendChild(item);
-                logsEl.scrollTop = logsEl.scrollHeight;
-            }
         }
 
         function updateSubtitleDisplay(activeTranslation = '', isInterim = false) {
