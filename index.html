@@ -735,48 +735,19 @@
             }
 
             if (role === 'student') {
-                let studentInterimTimeout = null;
-                let studentLastTranslationTime = 0;
-
-                const translateStudentInterim = (text, sourceLang, targetLang, callback) => {
-                    const now = Date.now();
-                    const delay = 800; // 800ms throttle to prevent rate limit
-
-                    if (studentInterimTimeout) {
-                        clearTimeout(studentInterimTimeout);
-                    }
-
-                    const performTranslation = async () => {
-                        studentLastTranslationTime = Date.now();
-                        try {
-                            const translation = await translateText(text, sourceLang, targetLang);
-                            callback(translation);
-                        } catch (e) {
-                            console.error("Student interim translation error:", e);
-                        }
-                    };
-
-                    if (now - studentLastTranslationTime >= delay) {
-                        performTranslation();
-                    } else {
-                        studentInterimTimeout = setTimeout(performTranslation, delay - (now - studentLastTranslationTime));
-                    }
-                };
-
                 const handleReceivedMessage = (data) => {
-                    const studentLang = document.getElementById('studentLang').value;
-                    const teacherLangSelect = document.getElementById('teacherLang');
-                    const sourceLang = teacherLangSelect ? teacherLangSelect.value.split('-')[0] : 'te';
-
                     if (data.type === 'transcript') {
-                        if (studentInterimTimeout) {
-                            clearTimeout(studentInterimTimeout);
+                        if (data.finalizedLines) {
+                            studentFinalizedLines = [...data.finalizedLines];
+                        } else {
+                            studentFinalizedLines.push(data.translation);
+                            if (studentFinalizedLines.length > 10) {
+                                studentFinalizedLines.shift();
+                            }
                         }
-                        handleStudentReceivedTranscript(data.original);
+                        updateStudentSubtitleDisplay();
                     } else if (data.type === 'interim') {
-                        translateStudentInterim(data.original, sourceLang, studentLang, (translatedText) => {
-                            updateStudentSubtitleDisplay(translatedText, true);
-                        });
+                        updateStudentSubtitleDisplay(data.translation, true);
                     } else if (data.type === 'status') {
                         if (data.status === 'speaking' && studentFinalizedLines.length === 0) {
                             updateStudentSubtitleDisplay("Teacher is speaking...", true);
@@ -852,26 +823,7 @@
             return ws;
         }
 
-        async function handleStudentReceivedTranscript(originalText) {
-            const studentLang = document.getElementById('studentLang').value;
-            const teacherLangSelect = document.getElementById('teacherLang');
-            const sourceLang = teacherLangSelect ? teacherLangSelect.value.split('-')[0] : 'te';
 
-            updateStudentSubtitleDisplay("Translating...", true);
-
-            try {
-                const translation = await translateText(originalText, sourceLang, studentLang);
-                studentFinalizedLines.push(translation);
-                if (studentFinalizedLines.length > 10) {
-                    studentFinalizedLines.shift();
-                }
-                updateStudentSubtitleDisplay();
-                document.getElementById('studentLangBadge').textContent = studentLang.toUpperCase();
-            } catch (err) {
-                console.error('Student translation error:', err);
-                updateStudentSubtitleDisplay("[Translation Error]");
-            }
-        }
 
         function updateConnectionStatus(connected) {
             const statusEl = currentMode === 'teacher' ? document.getElementById('apiStatus') : document.getElementById('studentApiStatus');
@@ -1002,15 +954,15 @@
                     // Update interim translation on-the-fly
                     translateInterim(interimTranscript, detectedLang, targetLang, (translatedText) => {
                         updateSubtitleDisplay(translatedText, true);
-                    });
 
-                    // Broadcast interim text so students see instant updates in their own language
-                    if (ws) {
-                        ws.send({
-                            type: 'interim',
-                            original: interimTranscript
-                        });
-                    }
+                        // Broadcast interim translation so students see instant updates directly
+                        if (ws) {
+                            ws.send({
+                                type: 'interim',
+                                translation: translatedText
+                            });
+                        }
+                    });
                 }
             };
 
@@ -1075,8 +1027,8 @@
                 if (ws) {
                     ws.send({
                         type: 'transcript',
-                        original: text,
-                        translation: translation
+                        translation: translation,
+                        finalizedLines: finalizedLines
                     });
                 }
 
