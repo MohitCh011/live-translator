@@ -1,0 +1,1334 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LiveTranslate - Real-time Teaching Subtitles</title>
+    <script src="https://cdn.jsdelivr.net/npm/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 30px 0;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(45deg, #00d4ff, #7b2cbf);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .mode-selector {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .mode-btn {
+            padding: 15px 40px;
+            border: 2px solid #00d4ff;
+            background: transparent;
+            color: #00d4ff;
+            font-size: 1.1rem;
+            cursor: pointer;
+            border-radius: 30px;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .mode-btn:hover,
+        .mode-btn.active {
+            background: #00d4ff;
+            color: #1e1e2e;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.3);
+        }
+
+        .main-interface {
+            display: none;
+            grid-template-columns: 1fr 300px;
+            gap: 30px;
+        }
+
+        .main-interface.active {
+            display: grid;
+        }
+
+        .video-section {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 20px;
+            padding: 20px;
+            position: relative;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            background: #000;
+            border-radius: 15px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #teacherVideo,
+        #studentVideo,
+        #localVideo,
+        #remoteVideo {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: black;
+        }
+
+        .subtitle-overlay {
+            position: relative;
+            width: 100%;
+            margin-top: 15px;
+            text-align: center;
+            left: auto;
+            bottom: auto;
+            transform: none;
+            z-index: 1;
+        }
+
+        .subtitle-box {
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            padding: 15px 25px;
+            border-radius: 15px;
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            width: 90%;
+            margin: auto;
+        }
+
+        .subtitle-box {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 15px 25px;
+            border-radius: 15px;
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            margin-bottom: 10px;
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .original-text {
+            display: none !important;
+        }
+
+        .translated-text {
+            color: #fff;
+            font-size: 1.5rem;
+            font-weight: 600;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+            margin-top: 5px;
+            word-wrap: break-word;
+        }
+
+        .language-badge {
+            display: inline-block;
+            background: #7b2cbf;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            margin-bottom: 5px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .control-btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #00d4ff, #0099cc);
+            color: #fff;
+        }
+
+        .btn-danger {
+            background: linear-gradient(45deg, #ff4757, #cc0033);
+            color: #fff;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .control-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .sidebar {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 25px;
+            height: fit-content;
+        }
+
+        .sidebar h3 {
+            margin-bottom: 20px;
+            color: #00d4ff;
+            font-size: 1.3rem;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.9rem;
+        }
+
+        select,
+        input {
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.3);
+            color: #fff;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        select:focus,
+        input:focus {
+            border-color: #00d4ff;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff4757;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.active {
+            background: #2ed573;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .transcript-history {
+            margin-top: 25px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            margin-bottom: 10px;
+            border-left: 3px solid #00d4ff;
+        }
+
+        .history-time {
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.5);
+            margin-bottom: 5px;
+        }
+
+        .history-text {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .student-view {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .join-code {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #00d4ff;
+            letter-spacing: 10px;
+            margin: 20px 0;
+            text-shadow: 0 0 30px rgba(0, 212, 255, 0.5);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .recording-indicator {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 0, 0, 0.8);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            display: none;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .recording-indicator.active {
+            display: flex;
+        }
+
+        .rec-dot {
+            width: 10px;
+            height: 10px;
+            background: #fff;
+            border-radius: 50%;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0;
+            }
+        }
+
+        .api-status {
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-size: 0.85rem;
+            text-align: center;
+        }
+
+        .api-status.connected {
+            background: rgba(46, 213, 115, 0.2);
+            color: #2ed573;
+            border: 1px solid #2ed573;
+        }
+
+        .api-status.disconnected {
+            background: rgba(255, 71, 87, 0.2);
+            color: #ff4757;
+            border: 1px solid #ff4757;
+        }
+
+        @media (max-width: 968px) {
+            .main-interface {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>🎓 LiveTranslate</h1>
+            <p>Real-time multilingual subtitles for online teaching</p>
+        </header>
+
+        <div class="mode-selector" id="modeSelector">
+            <button class="mode-btn active" onclick="selectMode('teacher')">👨‍🏫 I'm Teaching</button>
+            <button class="mode-btn" onclick="selectMode('student')">🎒 I'm Learning</button>
+        </div>
+
+        <!-- Teacher Interface -->
+        <div class="main-interface active" id="teacherInterface">
+            <div class="video-section">
+                <div class="video-container">
+                    <video id="teacherVideo" autoplay muted playsinline></video>
+
+                    <div class="recording-indicator" id="recordingIndicator">
+                        <div class="rec-dot"></div>
+                        LIVE
+                    </div>
+                </div>
+
+                <div class="subtitle-overlay" id="subtitleOverlay">
+                    <div class="subtitle-box" id="currentSubtitle" style="display: none;">
+                        <span class="language-badge" id="detectedLang">
+                            Detecting...
+                        </span>
+
+
+
+                        <div class="translated-text" id="translatedText">
+                            Translation will appear here
+                        </div>
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <button class="control-btn btn-primary" id="startBtn" onclick="startTeaching()">
+                        <span>▶️</span> Start Teaching
+                    </button>
+                    <button class="control-btn btn-danger hidden" id="stopBtn" onclick="stopTeaching()">
+                        <span>⏹️</span> Stop
+                    </button>
+                    <button class="control-btn btn-secondary" onclick="toggleMute()">
+                        <span id="muteIcon">🎤</span> <span id="muteText">Mute</span>
+                    </button>
+                    <button class="control-btn btn-secondary" onclick="shareScreen()">
+                        <span>🖥️</span> Share Screen
+                    </button>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <h3>⚙️ Settings</h3>
+
+                <div class="form-group">
+                    <label>Your Language (Speaking)</label>
+                    <select id="teacherLang">
+                        <option value="en-US">English</option>
+                        <option value="te-IN" selected>Telugu</option>
+                        <option value="es-ES">Spanish</option>
+                        <option value="fr-FR">French</option>
+                        <option value="de-DE">German</option>
+                        <option value="zh-CN">Chinese (Simplified)</option>
+                        <option value="ja-JP">Japanese</option>
+                        <option value="ko-KR">Korean</option>
+                        <option value="hi-IN">Hindi</option>
+                        <option value="ar-SA">Arabic</option>
+                        <option value="pt-BR">Portuguese</option>
+                        <option value="ru-RU">Russian</option>
+                        <option value="it-IT">Italian</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Auto-Translate To</label>
+                    <select id="targetLang">
+                        <option value="es">Spanish</option>
+                        <option value="en" selected>English</option>
+                        <option value="te">Telugu</option>
+                        <option value="fr">French</option>
+                        <option value="de">German</option>
+                        <option value="zh">Chinese</option>
+                        <option value="ja">Japanese</option>
+                        <option value="ko">Korean</option>
+                        <option value="hi">Hindi</option>
+                        <option value="ar">Arabic</option>
+                        <option value="pt">Portuguese</option>
+                        <option value="ru">Russian</option>
+                        <option value="it">Italian</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Session Code</label>
+                    <input type="text" id="sessionCode" readonly value="Generating..."
+                        style="text-align: center; font-size: 1.2rem; letter-spacing: 3px;">
+                    </button>
+                </div>
+
+                <div class="api-status disconnected" id="apiStatus">
+                    🔴 WebSocket Disconnected
+                </div>
+
+                <div class="status-indicator">
+                    <div class="status-dot" id="statusDot"></div>
+                    <span id="statusText">Ready to start</span>
+                </div>
+
+                <div class="transcript-history" id="transcriptHistory">
+                    <h3 style="margin-bottom: 15px; color: #00d4ff;">📝 Recent Transcripts</h3>
+                    <div id="historyList"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Student Interface -->
+        <div class="main-interface" id="studentInterface">
+            <div class="video-section">
+                <div class="video-container">
+                    <video id="studentVideo" autoplay playsinline></video>
+                </div>
+
+                <div class="subtitle-overlay" id="studentSubtitleOverlay">
+                    <div class="subtitle-box" id="studentSubtitle" style="display: none;">
+                        <span class="language-badge" id="studentLangBadge">
+                            English
+                        </span>
+
+
+
+                        <div class="translated-text" id="studentTranslated">
+                            Join a session to see subtitles
+                        </div>
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <button class="control-btn btn-primary" onclick="joinSession()">
+                        <span>🔗</span> Join Session
+                    </button>
+                    <button class="control-btn btn-secondary" onclick="leaveSession()">
+                        <span>🚪</span> Leave
+                    </button>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <h3>🎓 Student Settings</h3>
+
+                <div class="form-group">
+                    <label>Your Preferred Language</label>
+                    <select id="studentLang">
+                        <option value="es">Spanish</option>
+                        <option value="en" selected>English</option>
+                        <option value="fr">French</option>
+                        <option value="de">German</option>
+                        <option value="zh">Chinese</option>
+                        <option value="ja">Japanese</option>
+                        <option value="ko">Korean</option>
+                        <option value="hi">Hindi</option>
+                        <option value="ar">Arabic</option>
+                        <option value="pt">Portuguese</option>
+                        <option value="ru">Russian</option>
+                        <option value="it">Italian</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Enter Session Code</label>
+                    <input type="text" id="joinCode" placeholder="Enter 6-digit code" maxlength="6"
+                        style="text-align: center; font-size: 1.2rem; letter-spacing: 5px; text-transform: uppercase;">
+                </div>
+
+                <div class="form-group" style="display: none;">
+                    <label>Display Mode</label>
+                    <select id="displayMode">
+                        <option value="both">Original + Translation</option>
+                        <option value="translation" selected>Translation Only</option>
+                        <option value="original">Original Only</option>
+                    </select>
+                </div>
+
+                <div class="api-status disconnected" id="studentApiStatus">
+                    🔴 Not Connected
+                </div>
+
+                <div class="status-indicator">
+                    <div class="status-dot" id="studentStatusDot"></div>
+                    <span id="studentStatusText">Enter code to join</span>
+                </div>
+
+                <div
+                    style="margin-top: 30px; padding: 20px; background: rgba(0,212,255,0.1); border-radius: 15px; border: 1px solid rgba(0,212,255,0.3);">
+                    <h4 style="color: #00d4ff; margin-bottom: 10px;">💡 How it works:</h4>
+                    <ol style="padding-left: 20px; line-height: 1.8; color: rgba(255,255,255,0.8);">
+                        <li>Enter the session code from your teacher</li>
+                        <li>Select your preferred language</li>
+                        <li>Click "Join Session"</li>
+                        <li>Subtitles will appear in real-time!</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let localStream = null;
+        let recognition = null;
+        let ws = null;
+        let isTeaching = false;
+        let currentMode = 'teacher';
+        let sessionId = null;
+        let peerConnection = null;
+        let students = new Map();
+
+        // Subtitle History (Last 4 Lines scrolling)
+        let finalizedLines = [];
+        let studentFinalizedLines = [];
+
+        // WebRTC Device-to-Device Synchronization
+        let peer = null;
+        let peerConnections = [];
+
+        function updateSubtitleDisplay(activeTranslation = '', isInterim = false) {
+            const subtitleEl = document.getElementById('translatedText');
+            let linesToShow = [...finalizedLines];
+            
+            if (activeTranslation) {
+                const styledActive = isInterim 
+                    ? `<span style="color: #00d4ff; font-style: italic; opacity: 0.9;">🎤 ${activeTranslation}</span>`
+                    : `<span>${activeTranslation}</span>`;
+                linesToShow.push(styledActive);
+            }
+            
+            if (linesToShow.length > 4) {
+                linesToShow = linesToShow.slice(linesToShow.length - 4);
+            }
+            
+            subtitleEl.innerHTML = linesToShow.map((line, idx) => {
+                const isLatest = (idx === linesToShow.length - 1);
+                const opacity = isLatest ? 1.0 : (idx === linesToShow.length - 2 ? 0.70 : (idx === linesToShow.length - 3 ? 0.45 : 0.25));
+                return `<div style="opacity: ${opacity}; line-height: 1.6; margin-bottom: 4px;">${line}</div>`;
+            }).join('');
+        }
+
+        function updateStudentSubtitleDisplay(activeTranslation = '', isInterim = false) {
+            const subtitleEl = document.getElementById('studentTranslated');
+            let linesToShow = [...studentFinalizedLines];
+            
+            if (activeTranslation) {
+                const styledActive = isInterim 
+                    ? `<span style="color: #00d4ff; font-style: italic; opacity: 0.9;">🎤 ${activeTranslation}</span>`
+                    : `<span>${activeTranslation}</span>`;
+                linesToShow.push(styledActive);
+            }
+            
+            if (linesToShow.length > 4) {
+                linesToShow = linesToShow.slice(linesToShow.length - 4);
+            }
+            
+            subtitleEl.innerHTML = linesToShow.map((line, idx) => {
+                const isLatest = (idx === linesToShow.length - 1);
+                const opacity = isLatest ? 1.0 : (idx === linesToShow.length - 2 ? 0.70 : (idx === linesToShow.length - 3 ? 0.45 : 0.25));
+                return `<div style="opacity: ${opacity}; line-height: 1.6; margin-bottom: 4px;">${line}</div>`;
+            }).join('');
+        }
+
+        // Generate random session code
+        function generateSessionCode() {
+            return Math.random().toString(36).substring(2, 8).toUpperCase();
+        }
+
+        // Mode selection
+        function selectMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            document.getElementById('teacherInterface').classList.toggle('active', mode === 'teacher');
+            document.getElementById('studentInterface').classList.toggle('active', mode === 'student');
+
+            if (mode === 'teacher') {
+                document.getElementById('sessionCode').value = generateSessionCode();
+            }
+        }
+
+        let sessionChannel = null;
+
+        // Initialize WebSocket connection using BroadcastChannel and PeerJS P2P for local + device-to-device synchronization
+        function connectWebSocket(role) {
+            if (sessionChannel) {
+                sessionChannel.close();
+            }
+            if (peer) {
+                peer.destroy();
+                peer = null;
+            }
+            peerConnections = [];
+
+            sessionChannel = new BroadcastChannel(`livetranslate-session-${sessionId}`);
+
+            if (role === 'teacher') {
+                peer = new Peer('lt-session-' + sessionId);
+
+                peer.on('open', (id) => {
+                    console.log('Teacher PeerJS registered with ID:', id);
+                    updateConnectionStatus(true);
+                });
+
+                peer.on('connection', (conn) => {
+                    console.log('Student connected to Teacher via PeerJS:', conn.peer);
+                    peerConnections.push(conn);
+
+                    // Send current finalized history so student gets immediate catchup!
+                    conn.on('open', () => {
+                        conn.send({
+                            type: 'catchup',
+                            finalizedLines: finalizedLines
+                        });
+                    });
+
+                    conn.on('close', () => {
+                        peerConnections = peerConnections.filter(c => c !== conn);
+                    });
+                });
+
+                peer.on('error', (err) => {
+                    console.error('Teacher PeerJS error:', err);
+                });
+            }
+
+            if (role === 'student') {
+                let studentInterimTimeout = null;
+                let studentLastTranslationTime = 0;
+
+                const translateStudentInterim = (text, sourceLang, targetLang, callback) => {
+                    const now = Date.now();
+                    const delay = 800; // 800ms throttle to prevent rate limit
+
+                    if (studentInterimTimeout) {
+                        clearTimeout(studentInterimTimeout);
+                    }
+
+                    const performTranslation = async () => {
+                        studentLastTranslationTime = Date.now();
+                        try {
+                            const translation = await translateText(text, sourceLang, targetLang);
+                            callback(translation);
+                        } catch (e) {
+                            console.error("Student interim translation error:", e);
+                        }
+                    };
+
+                    if (now - studentLastTranslationTime >= delay) {
+                        performTranslation();
+                    } else {
+                        studentInterimTimeout = setTimeout(performTranslation, delay - (now - studentLastTranslationTime));
+                    }
+                };
+
+                const handleReceivedMessage = (data) => {
+                    const studentLang = document.getElementById('studentLang').value;
+                    const teacherLangSelect = document.getElementById('teacherLang');
+                    const sourceLang = teacherLangSelect ? teacherLangSelect.value.split('-')[0] : 'te';
+
+                    if (data.type === 'transcript') {
+                        if (studentInterimTimeout) {
+                            clearTimeout(studentInterimTimeout);
+                        }
+                        handleStudentReceivedTranscript(data.original);
+                    } else if (data.type === 'interim') {
+                        translateStudentInterim(data.original, sourceLang, studentLang, (translatedText) => {
+                            updateStudentSubtitleDisplay(translatedText, true);
+                        });
+                    } else if (data.type === 'status') {
+                        if (data.status === 'speaking' && studentFinalizedLines.length === 0) {
+                            updateStudentSubtitleDisplay("Teacher is speaking...", true);
+                        }
+                    } else if (data.type === 'catchup') {
+                        if (data.finalizedLines) {
+                            studentFinalizedLines = [...data.finalizedLines];
+                            updateStudentSubtitleDisplay();
+                        }
+                    }
+                };
+
+                // 1. Listen via Local BroadcastChannel
+                sessionChannel.onmessage = (event) => {
+                    handleReceivedMessage(event.data);
+                };
+
+                // 2. Connect via PeerJS (Network/Mobile)
+                peer = new Peer();
+                peer.on('open', (id) => {
+                    console.log('Student PeerJS registered with ID:', id);
+                    const conn = peer.connect('lt-session-' + sessionId);
+                    peerConnections.push(conn);
+
+                    conn.on('open', () => {
+                        console.log('Student connected to Teacher session:', sessionId);
+                        updateConnectionStatus(true);
+                        document.getElementById('studentStatusText').textContent = 'Connected to session ' + sessionId;
+                    });
+
+                    conn.on('data', (data) => {
+                        handleReceivedMessage(data);
+                    });
+
+                    conn.on('close', () => {
+                        updateConnectionStatus(false);
+                        document.getElementById('studentStatusText').textContent = 'Session ended by teacher';
+                    });
+                });
+
+                peer.on('error', (err) => {
+                    console.error('Student PeerJS error:', err);
+                });
+            }
+
+            ws = {
+                send: function (data) {
+                    console.log('Sending:', data);
+                    if (sessionChannel) {
+                        sessionChannel.postMessage(data);
+                    }
+                    peerConnections.forEach((conn) => {
+                        if (conn.open) {
+                            conn.send(data);
+                        }
+                    });
+                },
+                close: function () {
+                    console.log('WebSocket closed');
+                    if (sessionChannel) {
+                        sessionChannel.close();
+                        sessionChannel = null;
+                    }
+                    if (peer) {
+                        peer.destroy();
+                        peer = null;
+                    }
+                    peerConnections = [];
+                }
+            };
+
+            updateConnectionStatus(true);
+            return ws;
+        }
+
+        async function handleStudentReceivedTranscript(originalText) {
+            const studentLang = document.getElementById('studentLang').value;
+            const teacherLangSelect = document.getElementById('teacherLang');
+            const sourceLang = teacherLangSelect ? teacherLangSelect.value.split('-')[0] : 'te';
+
+            updateStudentSubtitleDisplay("Translating...", true);
+
+            try {
+                const translation = await translateText(originalText, sourceLang, studentLang);
+                studentFinalizedLines.push(translation);
+                if (studentFinalizedLines.length > 10) {
+                    studentFinalizedLines.shift();
+                }
+                updateStudentSubtitleDisplay();
+                document.getElementById('studentLangBadge').textContent = studentLang.toUpperCase();
+            } catch (err) {
+                console.error('Student translation error:', err);
+                updateStudentSubtitleDisplay("[Translation Error]");
+            }
+        }
+
+        function updateConnectionStatus(connected) {
+            const statusEl = currentMode === 'teacher' ? document.getElementById('apiStatus') : document.getElementById('studentApiStatus');
+            if (connected) {
+                statusEl.className = 'api-status connected';
+                statusEl.textContent = '🟢 Connected';
+            } else {
+                statusEl.className = 'api-status disconnected';
+                statusEl.textContent = '🔴 Disconnected';
+            }
+        }
+
+        // Start teaching
+        async function startTeaching() {
+            try {
+                // Get camera and microphone
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        sampleRate: 44100
+                    }
+                });
+
+                const video = document.getElementById('teacherVideo');
+                video.srcObject = localStream;
+
+                // Generate session
+                sessionId = document.getElementById('sessionCode').value;
+
+                // Connect WebSocket
+                connectWebSocket('teacher');
+
+                // Initialize speech recognition
+                initSpeechRecognition();
+
+                // Update UI
+                document.getElementById('startBtn').classList.add('hidden');
+                document.getElementById('stopBtn').classList.remove('hidden');
+                document.getElementById('recordingIndicator').classList.add('active');
+                document.getElementById('currentSubtitle').style.display = 'block';
+                document.getElementById('statusDot').classList.add('active');
+                document.getElementById('statusText').textContent = 'Live - Students can join now';
+
+                finalizedLines = [];
+                updateSubtitleDisplay();
+
+                // Set initial target language badge
+                const targetLangSelect = document.getElementById('targetLang');
+                document.getElementById('detectedLang').textContent = targetLangSelect.options[targetLangSelect.selectedIndex].text;
+
+                isTeaching = true;
+
+                // Start speech recognition
+                recognition.start();
+
+            } catch (err) {
+                console.error('Error starting teaching:', err);
+                alert('Error accessing camera/microphone. Please allow permissions.');
+            }
+        }
+
+        let interimTranslationTimeout = null;
+        let lastInterimTranslationTime = 0;
+
+        function translateInterim(text, sourceLang, targetLang, callback) {
+            const now = Date.now();
+            const delay = 800; // 800ms throttle to prevent Google rate limit
+
+            if (interimTranslationTimeout) {
+                clearTimeout(interimTranslationTimeout);
+            }
+
+            const performTranslation = async () => {
+                lastInterimTranslationTime = Date.now();
+                try {
+                    const translation = await translateText(text, sourceLang, targetLang);
+                    callback(translation);
+                } catch (e) {
+                    console.error("Interim translation error:", e);
+                }
+            };
+
+            if (now - lastInterimTranslationTime >= delay) {
+                performTranslation();
+            } else {
+                interimTranslationTimeout = setTimeout(performTranslation, delay - (now - lastInterimTranslationTime));
+            }
+        }
+
+        // Initialize Web Speech API
+        function initSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+            if (!SpeechRecognition) {
+                alert('Speech recognition not supported in this browser. Please use Chrome.');
+                return;
+            }
+
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = document.getElementById('teacherLang').value;
+
+            recognition.onresult = async (event) => {
+                let finalTranscript = '';
+                let interimTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript;
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+
+                const targetLang = document.getElementById('targetLang').value;
+                const detectedLang = document.getElementById('teacherLang').value.split('-')[0];
+
+                if (finalTranscript) {
+                    if (interimTranslationTimeout) {
+                        clearTimeout(interimTranslationTimeout);
+                    }
+                    await processTranscript(finalTranscript);
+                } else if (interimTranscript) {
+                    // Update interim translation on-the-fly
+                    translateInterim(interimTranscript, detectedLang, targetLang, (translatedText) => {
+                        updateSubtitleDisplay(translatedText, true);
+                    });
+
+                    // Broadcast interim text so students see instant updates in their own language
+                    if (ws) {
+                        ws.send({
+                            type: 'interim',
+                            original: interimTranscript
+                        });
+                    }
+                }
+            };
+
+            recognition.onerror = (event) => {
+                console.error('Speech recognition error:', event.error);
+                document.getElementById('statusText').textContent = `Mic Status: Error (${event.error}). Reconnecting...`;
+                if (event.error === 'not-allowed') {
+                    alert('Microphone access denied.');
+                }
+            };
+
+            recognition.onend = () => {
+                if (isTeaching) {
+                    // Update language setting dynamically on restart
+                    try {
+                        recognition.lang = document.getElementById('teacherLang').value;
+                        recognition.start(); // Restart if still teaching
+                        document.getElementById('statusText').textContent = 'Live - Students can join now';
+                    } catch (e) {
+                        console.warn("Failed to restart speech recognition immediately. Retrying in 200ms...", e);
+                        setTimeout(() => {
+                            if (isTeaching) {
+                                try {
+                                    recognition.start();
+                                    document.getElementById('statusText').textContent = 'Live - Students can join now';
+                                } catch (err) {
+                                    console.error("Failed to restart speech recognition on retry:", err);
+                                    document.getElementById('statusText').textContent = 'Mic stopped. Click Stop and Start to reset.';
+                                }
+                            }
+                        }, 200);
+                    }
+                }
+            };
+        }
+
+        // Process transcript with translation
+        async function processTranscript(text) {
+            const targetLang = document.getElementById('targetLang').value;
+            const detectedLang = document.getElementById('teacherLang').value;
+
+            updateSubtitleDisplay("Translating...", true);
+
+            try {
+                const translation = await translateText(
+                    text,
+                    detectedLang.split('-')[0],
+                    targetLang
+                );
+
+                finalizedLines.push(translation);
+                if (finalizedLines.length > 10) {
+                    finalizedLines.shift();
+                }
+                updateSubtitleDisplay();
+
+                // Dynamically update the target language badge text
+                const targetLangSelect = document.getElementById('targetLang');
+                document.getElementById('detectedLang').textContent = targetLangSelect.options[targetLangSelect.selectedIndex].text;
+
+                // Broadcast transcript to student session
+                if (ws) {
+                    ws.send({
+                        type: 'transcript',
+                        original: text,
+                        translation: translation
+                    });
+                }
+
+                addToHistory(text, translation);
+            } catch (err) {
+                updateSubtitleDisplay("Translation error", true);
+            }
+        }
+        // Fetch helper with timeout
+        async function fetchWithTimeout(resource, options = {}) {
+            const { timeout = 3500 } = options;
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), timeout);
+            try {
+                const response = await fetch(resource, {
+                    ...options,
+                    signal: controller.signal
+                });
+                clearTimeout(id);
+                return response;
+            } catch (error) {
+                clearTimeout(id);
+                throw error;
+            }
+        }
+
+        // Translation function using Google Translate API (Fallback Chain with Timeout)
+        async function translateText(text, sourceLang, targetLang) {
+            // Try to use Google Translate clients5 API (primary)
+            try {
+                const response = await fetchWithTimeout(`https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=${sourceLang}&tl=${targetLang}&q=${encodeURIComponent(text)}`, { timeout: 3500 });
+                const data = await response.json();
+                if (data && data[0]) {
+                    return data[0];
+                }
+            } catch (e) {
+                console.warn("Primary translation API failed, trying fallback...", e);
+            }
+
+            // Fallback to translate.googleapis.com single API
+            try {
+                const response = await fetchWithTimeout(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`, { timeout: 3500 });
+                const data = await response.json();
+                if (data && data[0]) {
+                    // Concatenate all segment translations for complete sentence accuracy
+                    return data[0].map(segment => segment[0]).filter(Boolean).join('');
+                }
+                return `[${targetLang.toUpperCase()}] ${text}`;
+            } catch (e) {
+                return `[${targetLang.toUpperCase()}] ${text}`; // Fallback
+            }
+        }
+
+        // Add to transcript history
+        function addToHistory(original, translation) {
+            const historyList = document.getElementById('historyList');
+            const time = new Date().toLocaleTimeString();
+
+            const item = document.createElement('div');
+            item.className = 'history-item';
+            item.innerHTML = `
+                <div class="history-time">${time}</div>
+                <div class="history-text">${translation}</div>
+            `;
+
+            historyList.insertBefore(item, historyList.firstChild);
+
+            // Keep only last 10 items
+            while (historyList.children.length > 10) {
+                historyList.removeChild(historyList.lastChild);
+            }
+        }
+
+        // Stop teaching
+        function stopTeaching() {
+            isTeaching = false;
+            finalizedLines = [];
+
+            if (recognition) {
+                recognition.stop();
+            }
+
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+            }
+
+            if (ws) {
+                ws.close();
+            }
+
+            document.getElementById('teacherVideo').srcObject = null;
+            document.getElementById('startBtn').classList.remove('hidden');
+            document.getElementById('stopBtn').classList.add('hidden');
+            document.getElementById('recordingIndicator').classList.remove('active');
+            document.getElementById('currentSubtitle').style.display = 'none';
+            document.getElementById('statusDot').classList.remove('active');
+            document.getElementById('statusText').textContent = 'Session ended';
+            updateConnectionStatus(false);
+        }
+
+        // Toggle mute
+        function toggleMute() {
+            if (localStream) {
+                const audioTrack = localStream.getAudioTracks()[0];
+                if (audioTrack) {
+                    audioTrack.enabled = !audioTrack.enabled;
+                    document.getElementById('muteIcon').textContent = audioTrack.enabled ? '🎤' : '🎤❌';
+                    document.getElementById('muteText').textContent = audioTrack.enabled ? 'Mute' : 'Unmute';
+                }
+            }
+        }
+
+        // Share screen
+        async function shareScreen() {
+            try {
+                const screenStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: true,
+                    audio: true
+                });
+
+                const video = document.getElementById('teacherVideo');
+                video.srcObject = screenStream;
+
+                screenStream.getVideoTracks()[0].onended = () => {
+                    video.srcObject = localStream;
+                };
+
+            } catch (err) {
+                console.error('Error sharing screen:', err);
+            }
+        }
+
+        // Student functions
+        async function joinSession() {
+            const code = document.getElementById('joinCode').value.toUpperCase();
+            if (code.length !== 6) {
+                alert('Please enter a valid 6-digit session code');
+                return;
+            }
+
+            sessionId = code;
+
+            try {
+                // Get student video (optional, for participation)
+                try {
+                    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                    document.getElementById('studentVideo').srcObject = localStream;
+                } catch (camErr) {
+                    console.warn("Camera access not available or blocked (common on HTTP local network mobile devices). Continuing in text-only subtitle mode...", camErr);
+                    // Hide student video element since there's no stream
+                    document.getElementById('studentVideo').style.display = 'none';
+                }
+
+                // Connect to session
+                connectWebSocket('student');
+                studentFinalizedLines = [];
+                updateStudentSubtitleDisplay("Connected! Waiting for teacher...", true);
+
+                // Simulate receiving data from teacher ONLY if they join with the DEMO12 code
+                if (code === 'DEMO12') {
+                    startStudentSimulation();
+                }
+
+                document.getElementById('studentStatusDot').classList.add('active');
+                document.getElementById('studentStatusText').textContent = 'Connected to session ' + code;
+                document.getElementById('studentSubtitle').style.display = 'block';
+
+            } catch (err) {
+                console.error('Error joining session:', err);
+                alert('Error joining session. Please check your camera permissions.');
+            }
+        }
+
+        function leaveSession() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+            }
+            studentFinalizedLines = [];
+            document.getElementById('studentVideo').srcObject = null;
+            document.getElementById('studentStatusDot').classList.remove('active');
+            document.getElementById('studentStatusText').textContent = 'Enter code to join';
+            document.getElementById('studentSubtitle').style.display = 'none';
+            updateConnectionStatus(false);
+            
+            // Clean up PeerJS on leave
+            if (peer) {
+                peer.destroy();
+                peer = null;
+            }
+            peerConnections = [];
+        }
+
+        // Simulate receiving transcript as student (for demo)
+        function broadcastToStudents(data) {
+            console.log('Broadcasting to students:', data);
+        }
+
+        function startStudentSimulation() {
+            // Simulate receiving transcripts every few seconds
+            const demoTexts = [
+                { original: "Hello everyone, welcome to today's class!", translation: "Hello everyone, welcome to today's class!" },
+                { original: "Today we will learn about photosynthesis.", translation: "Today we will learn about photosynthesis." },
+                { original: "Please open your textbooks to page 45.", translation: "Please open your textbooks to page 45." }
+            ];
+
+            let index = 0;
+            const interval = setInterval(() => {
+                if (!document.getElementById('studentStatusDot').classList.contains('active')) {
+                    clearInterval(interval);
+                    return;
+                }
+
+                const text = demoTexts[index % demoTexts.length];
+                displayStudentSubtitle(text.original, text.translation);
+                index++;
+            }, 5000);
+        }
+
+        function displayStudentSubtitle(original, translation) {
+            const studentLang = document.getElementById('studentLang').value;
+
+            document.getElementById('studentLangBadge').textContent = studentLang.toUpperCase();
+
+            studentFinalizedLines.push(translation);
+            if (studentFinalizedLines.length > 10) {
+                studentFinalizedLines.shift();
+            }
+            updateStudentSubtitleDisplay();
+        }
+
+        // Initialize
+        document.getElementById('sessionCode').value = generateSessionCode();
+
+        // Handle Enter key in join code
+        document.getElementById('joinCode').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') joinSession();
+        });
+
+        // Dynamic Settings Change Listeners
+        document.getElementById('teacherLang').addEventListener('change', () => {
+            if (isTeaching && recognition) {
+                recognition.stop(); // This triggers onend which restarts with new lang
+            }
+        });
+
+        document.getElementById('targetLang').addEventListener('change', () => {
+            if (isTeaching) {
+                const targetLangSelect = document.getElementById('targetLang');
+                document.getElementById('detectedLang').textContent = targetLangSelect.options[targetLangSelect.selectedIndex].text;
+            }
+        });
+    </script>
+</body>
+
+</html>
