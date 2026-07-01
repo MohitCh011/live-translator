@@ -900,18 +900,15 @@
         // Start teaching
         async function startTeaching() {
             try {
-                // Progressively request audio and video with safe constraints
+                // Progressively request video-only with safe constraints (prevent mic resource conflicts)
                 try {
                     localStream = await navigator.mediaDevices.getUserMedia({
                         video: true,
-                        audio: true
+                        audio: false // Do not capture audio here to prevent conflicts with SpeechRecognition
                     });
                 } catch (videoErr) {
-                    console.warn("Could not get video stream, falling back to audio-only...", videoErr);
-                    localStream = await navigator.mediaDevices.getUserMedia({
-                        video: false,
-                        audio: true
-                    });
+                    logDebug("Could not get local camera stream. Continuing in text-only mode...");
+                    localStream = null;
                     document.getElementById('teacherVideo').style.display = 'none';
                 }
 
