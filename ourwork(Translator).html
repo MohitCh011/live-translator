@@ -658,13 +658,17 @@
                 linesToShow.push(styledActive);
             }
             
-            if (linesToShow.length > 4) {
-                linesToShow = linesToShow.slice(linesToShow.length - 4);
+            if (linesToShow.length > 5) {
+                linesToShow = linesToShow.slice(linesToShow.length - 5);
             }
             
             subtitleEl.innerHTML = linesToShow.map((line, idx) => {
-                const isLatest = (idx === linesToShow.length - 1);
-                const opacity = isLatest ? 1.0 : (idx === linesToShow.length - 2 ? 0.70 : (idx === linesToShow.length - 3 ? 0.45 : 0.25));
+                const diff = linesToShow.length - 1 - idx;
+                let opacity = 1.0;
+                if (diff === 1) opacity = 0.80;
+                else if (diff === 2) opacity = 0.60;
+                else if (diff === 3) opacity = 0.40;
+                else if (diff === 4) opacity = 0.20;
                 return `<div style="opacity: ${opacity}; line-height: 1.6; margin-bottom: 4px;">${line}</div>`;
             }).join('');
         }
@@ -680,13 +684,17 @@
                 linesToShow.push(styledActive);
             }
             
-            if (linesToShow.length > 4) {
-                linesToShow = linesToShow.slice(linesToShow.length - 4);
+            if (linesToShow.length > 5) {
+                linesToShow = linesToShow.slice(linesToShow.length - 5);
             }
             
             subtitleEl.innerHTML = linesToShow.map((line, idx) => {
-                const isLatest = (idx === linesToShow.length - 1);
-                const opacity = isLatest ? 1.0 : (idx === linesToShow.length - 2 ? 0.70 : (idx === linesToShow.length - 3 ? 0.45 : 0.25));
+                const diff = linesToShow.length - 1 - idx;
+                let opacity = 1.0;
+                if (diff === 1) opacity = 0.80;
+                else if (diff === 2) opacity = 0.60;
+                else if (diff === 3) opacity = 0.40;
+                else if (diff === 4) opacity = 0.20;
                 return `<div style="opacity: ${opacity}; line-height: 1.6; margin-bottom: 4px;">${line}</div>`;
             }).join('');
         }
