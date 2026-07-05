@@ -412,6 +412,33 @@
             border: 1px solid #ff4757;
         }
 
+        /* Active Session Layout styling */
+        .main-interface.session-active {
+            grid-template-columns: 1fr !important;
+            gap: 0 !important;
+        }
+
+        .main-interface.session-active .sidebar {
+            position: fixed !important;
+            top: 20px !important;
+            right: -360px !important;
+            width: 320px !important;
+            height: calc(100vh - 40px) !important;
+            z-index: 1000 !important;
+            box-shadow: -10px 0 30px rgba(0, 0, 0, 0.6) !important;
+            background: rgba(15, 15, 25, 0.98) !important;
+            border: 1px solid rgba(0, 212, 255, 0.3) !important;
+            overflow-y: auto !important;
+        }
+
+        .main-interface.session-active .sidebar.open {
+            right: 20px !important;
+        }
+
+        .sidebar-close-btn.hidden {
+            display: none !important;
+        }
+
 
 
         @media (max-width: 968px) {
@@ -503,14 +530,23 @@
                     <button class="control-btn btn-secondary" onclick="clearSubtitles()">
                         <span>🧹</span> Clear Subtitles
                     </button>
+                    <button class="control-btn btn-secondary" id="pauseBtn" onclick="togglePauseSubtitles()">
+                        <span id="pauseIcon">⏸️</span> <span id="pauseText">Pause Subtitles</span>
+                    </button>
                     <button class="control-btn btn-secondary layout-toggle-btn" onclick="toggleLayout()">
                         <span>📖</span> Split Layout
+                    </button>
+                    <button class="control-btn btn-secondary settings-toggle-btn hidden" id="teacherSettingsToggle" onclick="toggleSidebar()">
+                        <span>⚙️</span> Settings
                     </button>
                 </div>
             </div>
 
             <div class="sidebar">
-                <h3>⚙️ Settings</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 style="margin: 0;">⚙️ Settings</h3>
+                    <button class="control-btn btn-secondary sidebar-close-btn hidden" onclick="toggleSidebar()" style="padding: 5px 10px; font-size: 0.8rem; border-radius: 10px;">✕ Close</button>
+                </div>
 
                 <div class="form-group">
                     <label>Your Language (Speaking)</label>
@@ -551,10 +587,14 @@
                 </div>
 
                 <div class="form-group">
+                    <label>Subtitle Font Size: <span id="fontSizeVal">2.2rem</span></label>
+                    <input type="range" id="fontSizeSlider" min="1.0" max="3.5" step="0.1" value="2.2" oninput="changeFontSize(this.value)" style="width: 100%;">
+                </div>
+
+                <div class="form-group">
                     <label>Session Code</label>
                     <input type="text" id="sessionCode" readonly value="Generating..."
                         style="text-align: center; font-size: 1.2rem; letter-spacing: 3px;">
-                    </button>
                 </div>
 
                 <div class="api-status disconnected" id="apiStatus">
@@ -606,11 +646,17 @@
                     <button class="control-btn btn-secondary layout-toggle-btn" onclick="toggleLayout()">
                         <span>📖</span> Split Layout
                     </button>
+                    <button class="control-btn btn-secondary settings-toggle-btn hidden" id="studentSettingsToggle" onclick="toggleSidebar()">
+                        <span>⚙️</span> Settings
+                    </button>
                 </div>
             </div>
 
             <div class="sidebar">
-                <h3>🎓 Student Settings</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 style="margin: 0;">🎓 Student Settings</h3>
+                    <button class="control-btn btn-secondary sidebar-close-btn hidden" onclick="toggleSidebar()" style="padding: 5px 10px; font-size: 0.8rem; border-radius: 10px;">✕ Close</button>
+                </div>
 
                 <div class="form-group">
                     <label>Your Preferred Language</label>
@@ -628,6 +674,11 @@
                         <option value="ru">Russian</option>
                         <option value="it">Italian</option>
                     </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Subtitle Font Size: <span id="studentFontSizeVal">2.2rem</span></label>
+                    <input type="range" id="studentFontSizeSlider" min="1.0" max="3.5" step="0.1" value="2.2" oninput="changeStudentFontSize(this.value)" style="width: 100%;">
                 </div>
 
                 <div class="form-group">
@@ -832,6 +883,12 @@
                     } else if (data.type === 'clear') {
                         studentFinalizedLines = [];
                         updateStudentSubtitleDisplay();
+                    } else if (data.type === 'pauseState') {
+                        if (data.paused) {
+                            updateStudentSubtitleDisplay("(Translation Paused)", true);
+                        } else {
+                            updateStudentSubtitleDisplay();
+                        }
                     } else if (data.type === 'catchup') {
                         if (data.finalizedLines) {
                             studentFinalizedLines = [...data.finalizedLines];
@@ -964,6 +1021,10 @@
                 document.getElementById('statusDot').classList.add('active');
                 document.getElementById('statusText').textContent = 'Live - Students can join now';
 
+                document.getElementById('teacherInterface').classList.add('session-active');
+                document.getElementById('teacherSettingsToggle').classList.remove('hidden');
+                document.getElementById('teacherInterface').querySelector('.sidebar-close-btn').classList.remove('hidden');
+
                 finalizedLines = [];
                 updateSubtitleDisplay();
 
@@ -1047,12 +1108,14 @@
                 const detectedLang = document.getElementById('teacherLang').value.split('-')[0];
 
                 if (finalTranscript) {
+                    if (isPaused) return;
                     logDebug('Speech detected (Final): "' + finalTranscript + '"');
                     if (interimTranslationTimeout) {
                         clearTimeout(interimTranslationTimeout);
                     }
                     await processTranscript(finalTranscript);
                 } else if (interimTranscript) {
+                    if (isPaused) return;
                     logDebug('Speech detected (Interim): "' + interimTranscript + '"');
                     // Update interim translation on-the-fly
                     translateInterim(interimTranscript, detectedLang, targetLang, (translatedText) => {
@@ -1234,6 +1297,17 @@
             document.getElementById('currentSubtitle').style.display = 'none';
             document.getElementById('statusDot').classList.remove('active');
             document.getElementById('statusText').textContent = 'Session ended';
+            
+            const teacherInt = document.getElementById('teacherInterface');
+            teacherInt.classList.remove('session-active');
+            teacherInt.querySelector('.sidebar').classList.remove('open');
+            document.getElementById('teacherSettingsToggle').classList.add('hidden');
+            teacherInt.querySelector('.sidebar-close-btn').classList.add('hidden');
+            
+            if (isPaused) {
+                togglePauseSubtitles();
+            }
+
             updateConnectionStatus(false);
         }
 
@@ -1308,6 +1382,10 @@
                 studentFinalizedLines = [];
                 updateStudentSubtitleDisplay("Connected! Waiting for teacher...", true);
 
+                document.getElementById('studentInterface').classList.add('session-active');
+                document.getElementById('studentSettingsToggle').classList.remove('hidden');
+                document.getElementById('studentInterface').querySelector('.sidebar-close-btn').classList.remove('hidden');
+
                 // Simulate receiving data from teacher ONLY if they join with the DEMO12 code
                 if (code === 'DEMO12') {
                     startStudentSimulation();
@@ -1332,6 +1410,13 @@
             document.getElementById('studentStatusDot').classList.remove('active');
             document.getElementById('studentStatusText').textContent = 'Enter code to join';
             document.getElementById('studentSubtitle').style.display = 'none';
+            
+            const studentInt = document.getElementById('studentInterface');
+            studentInt.classList.remove('session-active');
+            studentInt.querySelector('.sidebar').classList.remove('open');
+            document.getElementById('studentSettingsToggle').classList.add('hidden');
+            studentInt.querySelector('.sidebar-close-btn').classList.add('hidden');
+            
             updateConnectionStatus(false);
             
             // Clean up PeerJS on leave
@@ -1422,13 +1507,75 @@
             });
         }
 
-        // Apply layout preference on load
+        let isPaused = false;
+        function togglePauseSubtitles() {
+            isPaused = !isPaused;
+            const icon = document.getElementById('pauseIcon');
+            const text = document.getElementById('pauseText');
+            const btn = document.getElementById('pauseBtn');
+            
+            if (isPaused) {
+                icon.textContent = '▶️';
+                text.textContent = 'Resume Subtitles';
+                btn.style.background = 'linear-gradient(45deg, #ff9f43, #ff6b6b)';
+                updateSubtitleDisplay("(Translation Paused)", true);
+            } else {
+                icon.textContent = '⏸️';
+                text.textContent = 'Pause Subtitles';
+                btn.style.background = 'rgba(255, 255, 255, 0.1)';
+                updateSubtitleDisplay();
+            }
+
+            if (ws) {
+                ws.send({
+                    type: 'pauseState',
+                    paused: isPaused
+                });
+            }
+        }
+
+        function changeFontSize(val) {
+            document.getElementById('fontSizeVal').textContent = val + 'rem';
+            document.getElementById('translatedText').style.fontSize = val + 'rem';
+            localStorage.setItem('subtitleFontSize', val);
+        }
+
+        function changeStudentFontSize(val) {
+            document.getElementById('studentFontSizeVal').textContent = val + 'rem';
+            document.getElementById('studentTranslated').style.fontSize = val + 'rem';
+            localStorage.setItem('studentSubtitleFontSize', val);
+        }
+
+        function toggleSidebar() {
+            const activeInterface = currentMode === 'teacher' 
+                ? document.getElementById('teacherInterface') 
+                : document.getElementById('studentInterface');
+            
+            const sidebar = activeInterface.querySelector('.sidebar');
+            sidebar.classList.toggle('open');
+        }
+
+        // Apply layout preference and custom font sizes on load
         window.addEventListener('DOMContentLoaded', () => {
             const pref = localStorage.getItem('layoutPreference');
             if (pref === 'split') {
                 const sections = document.querySelectorAll('.video-section');
                 sections.forEach(sec => sec.classList.add('split-layout'));
                 updateLayoutButtonText(true);
+            }
+            
+            const savedSize = localStorage.getItem('subtitleFontSize');
+            if (savedSize) {
+                const slider = document.getElementById('fontSizeSlider');
+                if (slider) slider.value = savedSize;
+                changeFontSize(savedSize);
+            }
+            
+            const savedStudentSize = localStorage.getItem('studentSubtitleFontSize');
+            if (savedStudentSize) {
+                const slider = document.getElementById('studentFontSizeSlider');
+                if (slider) slider.value = savedStudentSize;
+                changeStudentFontSize(savedStudentSize);
             }
         });
     </script>
