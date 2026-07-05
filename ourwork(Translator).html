@@ -465,6 +465,9 @@
                     <button class="control-btn btn-secondary" onclick="shareScreen()">
                         <span>🖥️</span> Share Screen
                     </button>
+                    <button class="control-btn btn-secondary" onclick="clearSubtitles()">
+                        <span>🧹</span> Clear Subtitles
+                    </button>
                 </div>
             </div>
 
@@ -790,6 +793,9 @@
                             studentFinalizedLines = [...data.finalizedLines];
                             updateStudentSubtitleDisplay();
                         }
+                    } else if (data.type === 'clear') {
+                        studentFinalizedLines = [];
+                        updateStudentSubtitleDisplay();
                     }
                 };
 
@@ -1219,6 +1225,19 @@
 
             } catch (err) {
                 console.error('Error sharing screen:', err);
+            }
+        }
+
+        // Clear all subtitle history
+        function clearSubtitles() {
+            finalizedLines = [];
+            updateSubtitleDisplay();
+            
+            // Broadcast clear command to students
+            if (ws) {
+                ws.send({
+                    type: 'clear'
+                });
             }
         }
 
