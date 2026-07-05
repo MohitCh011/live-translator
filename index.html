@@ -127,16 +127,36 @@
             border: 1px solid rgba(0, 212, 255, 0.3);
             width: 90%;
             margin: auto;
+            animation: slideUp 0.3s ease;
         }
 
-        .subtitle-box {
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(10px);
-            padding: 15px 25px;
-            border-radius: 15px;
-            border: 1px solid rgba(0, 212, 255, 0.3);
-            margin-bottom: 10px;
-            animation: slideUp 0.3s ease;
+        /* Split/Horizontal Layout */
+        .video-section.split-layout {
+            flex-direction: row !important;
+            align-items: stretch !important;
+            gap: 20px !important;
+        }
+
+        .video-section.split-layout .video-container {
+            width: 45% !important;
+            aspect-ratio: 16/9 !important;
+            max-height: none !important;
+        }
+
+        .video-section.split-layout .subtitle-overlay {
+            width: 55% !important;
+            margin-top: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+        }
+
+        .video-section.split-layout .subtitle-box {
+            width: 100% !important;
+            margin: 0 !important;
+            height: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
         }
 
         @keyframes slideUp {
@@ -401,12 +421,27 @@
         }
 
         @media (max-width: 600px) {
+            .video-container {
+                max-height: 180px !important;
+                aspect-ratio: auto !important;
+            }
             .translated-text {
                 font-size: 1.5rem !important;
                 line-height: 1.3 !important;
             }
             .subtitle-box {
                 padding: 10px 15px !important;
+            }
+            /* Force vertical layout on mobile regardless of layout state */
+            .video-section.split-layout {
+                flex-direction: column !important;
+                gap: 10px !important;
+            }
+            .video-section.split-layout .video-container {
+                width: 100% !important;
+            }
+            .video-section.split-layout .subtitle-overlay {
+                width: 100% !important;
             }
         }
     </style>
@@ -467,6 +502,9 @@
                     </button>
                     <button class="control-btn btn-secondary" onclick="clearSubtitles()">
                         <span>🧹</span> Clear Subtitles
+                    </button>
+                    <button class="control-btn btn-secondary layout-toggle-btn" onclick="toggleLayout()">
+                        <span>📖</span> Split Layout
                     </button>
                 </div>
             </div>
@@ -564,6 +602,9 @@
                     </button>
                     <button class="control-btn btn-secondary" onclick="leaveSession()">
                         <span>🚪</span> Leave
+                    </button>
+                    <button class="control-btn btn-secondary layout-toggle-btn" onclick="toggleLayout()">
+                        <span>📖</span> Split Layout
                     </button>
                 </div>
             </div>
@@ -1358,6 +1399,36 @@
             if (isTeaching) {
                 const targetLangSelect = document.getElementById('targetLang');
                 document.getElementById('detectedLang').textContent = targetLangSelect.options[targetLangSelect.selectedIndex].text;
+            }
+        });
+
+        function toggleLayout() {
+            const sections = document.querySelectorAll('.video-section');
+            sections.forEach(sec => {
+                sec.classList.toggle('split-layout');
+            });
+            
+            const isSplit = sections[0].classList.contains('split-layout');
+            localStorage.setItem('layoutPreference', isSplit ? 'split' : 'default');
+            updateLayoutButtonText(isSplit);
+        }
+
+        function updateLayoutButtonText(isSplit) {
+            const btns = document.querySelectorAll('.layout-toggle-btn');
+            btns.forEach(btn => {
+                btn.innerHTML = isSplit 
+                    ? '<span>🥞</span> Stack Layout' 
+                    : '<span>📖</span> Split Layout';
+            });
+        }
+
+        // Apply layout preference on load
+        window.addEventListener('DOMContentLoaded', () => {
+            const pref = localStorage.getItem('layoutPreference');
+            if (pref === 'split') {
+                const sections = document.querySelectorAll('.video-section');
+                sections.forEach(sec => sec.classList.add('split-layout'));
+                updateLayoutButtonText(true);
             }
         });
     </script>
