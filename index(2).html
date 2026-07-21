@@ -1,0 +1,2126 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LiveTranslate - Real-time Teaching Subtitles</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#10b981">
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: #0b0d17;
+            background-image:
+                radial-gradient(circle at 10% 20%, rgba(16, 185, 129, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(99, 102, 241, 0.05) 0%, transparent 40%);
+            height: 100vh;
+            color: #f1f5f9;
+            overflow: hidden;
+            /* Full-screen app layout, prevent body scroll */
+        }
+
+        .container {
+            width: 100%;
+            height: 100vh;
+            max-width: none;
+            margin: 0;
+            padding: 20px 24px 24px 24px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 28px;
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            margin-bottom: 16px;
+            flex-shrink: 0;
+            backdrop-filter: blur(10px);
+        }
+
+        header h1 {
+            font-size: 1.8rem;
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(16, 185, 129, 0.1);
+        }
+
+        header p {
+            font-size: 0.9rem;
+            color: #64748b;
+            font-weight: 400;
+        }
+
+        .mode-selector {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            margin: 0 auto 16px auto;
+            width: fit-content;
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 30px;
+            padding: 6px;
+            backdrop-filter: blur(10px);
+            flex-shrink: 0;
+        }
+
+        .mode-btn {
+            padding: 10px 28px;
+            border: none;
+            background: transparent;
+            color: #94a3b8;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 20px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .mode-btn:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .mode-btn.active {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .main-interface {
+            display: none;
+            grid-template-areas: "sidebar workspace";
+            grid-template-columns: 350px 1fr;
+            gap: 24px;
+            flex-grow: 1;
+            overflow: hidden;
+            min-height: 0;
+            /* Crucial for nested scroll containers */
+        }
+
+        .main-interface.active {
+            display: grid;
+        }
+
+        .video-section {
+            grid-area: workspace;
+            background: rgba(15, 23, 42, 0.45);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 28px;
+            padding: 28px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            backdrop-filter: blur(30px);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            max-width: 320px;
+            /* Even smaller for dashboard elegance */
+            margin: 0 auto;
+            background: #030712;
+            border-radius: 16px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            flex-shrink: 0;
+
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .video-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            flex-shrink: 0;
+            width: 100%;
+        }
+
+        .video-section.split-layout .video-wrapper {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 10px !important;
+        }
+
+        .video-section.split-layout .video-wrapper .video-container {
+            width: 100% !important;
+            max-width: none !important;
+        }
+
+        .video-action-area {
+            flex-shrink: 0;
+        }
+
+        .video-action-area .control-btn {
+            width: 100px;
+            height: 50px;
+            padding: 10px 24px;
+            font-size: 0.95rem;
+            justify-content: center;
+            border-radius: 12px;
+            margin: 0;
+        }
+
+        .video-section.split-layout .video-action-area .control-btn {
+            width: 100% !important;
+        }
+
+        #teacherVideo,
+        #studentVideo,
+        #localVideo,
+        #remoteVideo {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: black;
+        }
+
+        .subtitle-overlay {
+            position: relative;
+            width: 100%;
+            z-index: 1;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            min-height: 0;
+        }
+
+        .subtitle-box {
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(20px);
+            padding: 20px 30px;
+            border-radius: 20px;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            box-shadow:
+                0 15px 35px rgba(0, 0, 0, 0.4),
+                inset 0 0 30px rgba(16, 185, 129, 0.03);
+            animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow-y: auto;
+        }
+
+        /* Split/Horizontal Layout */
+        .video-section.split-layout {
+            display: grid !important;
+            grid-template-areas:
+                "subtitles video"
+                "controls controls";
+            grid-template-columns: 1fr 280px;
+            gap: 20px;
+        }
+
+        .video-section.split-layout .video-container {
+            grid-area: video;
+            width: 100% !important;
+            max-width: none !important;
+            margin: 0 !important;
+            align-self: start;
+        }
+
+        .video-section.split-layout .subtitle-overlay {
+            grid-area: subtitles;
+            margin-top: 0 !important;
+            height: 100% !important;
+            display: flex !important;
+        }
+
+        .video-section.split-layout .subtitle-box {
+            width: 100% !important;
+            height: 100% !important;
+            margin: 0 !important;
+        }
+
+        .video-section.split-layout .controls {
+            grid-area: controls;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .original-text {
+            display: none !important;
+        }
+
+        .translated-text {
+            color: #ffffff;
+            font-size: 2.4rem;
+            font-weight: 700;
+            line-height: 1.4;
+            text-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+            margin-top: 8px;
+            word-wrap: break-word;
+        }
+
+        .language-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(6, 182, 212, 0.2) 100%);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            padding: 6px 16px;
+            border-radius: 30px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+            width: fit-content;
+            align-self: center;
+            flex-shrink: 0;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .control-btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: #030712;
+            font-weight: 700;
+            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.25);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+            background: linear-gradient(135deg, #34d399 0%, #059669 100%);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: #fff;
+            box-shadow: 0 4px 20px rgba(239, 68, 68, 0.25);
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4);
+            background: linear-gradient(135deg, #f87171 0%, #dc2626 100%);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.03);
+            color: #cbd5e1;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .control-btn:active {
+            transform: translateY(0);
+        }
+
+        .sidebar {
+            grid-area: sidebar;
+            background: rgba(15, 23, 42, 0.55);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 24px;
+            padding: 24px;
+            height: 100%;
+            overflow-y: auto;
+            backdrop-filter: blur(35px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .sidebar h3 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #10b981;
+            margin-bottom: 6px;
+            letter-spacing: -0.02em;
+        }
+
+        .form-group {
+            margin-bottom: 0px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #94a3b8;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        select,
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(3, 7, 18, 0.4);
+            color: #f8fafc;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.9rem;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        select:focus,
+        input[type="text"]:focus {
+            border-color: #10b981;
+            background: rgba(3, 7, 18, 0.6);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            outline: none;
+            border: none;
+            margin: 10px 0;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #10b981;
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+            transition: all 0.2s ease-in-out;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 0 12px rgba(16, 185, 129, 0.8);
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px;
+            background: rgba(3, 7, 18, 0.3);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            margin-top: auto;
+            /* Push connection indicators to bottom of sidebar */
+            flex-shrink: 0;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ef4444;
+            box-shadow: 0 0 8px #ef4444;
+        }
+
+        .status-dot.active {
+            background: #10b981;
+            box-shadow: 0 0 8px #10b981;
+        }
+
+        .transcript-history {
+            margin-top: 10px;
+            max-height: 240px;
+            overflow-y: auto;
+            padding-right: 4px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .history-item {
+            padding: 12px 14px;
+            background: rgba(3, 7, 18, 0.25);
+            border-radius: 10px;
+            margin-bottom: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-left: 3px solid #10b981;
+            transition: all 0.2s;
+        }
+
+        .history-item:hover {
+            background: rgba(3, 7, 18, 0.4);
+            border-color: rgba(255, 255, 255, 0.08);
+            transform: translateX(2px);
+        }
+
+        .history-time {
+            font-size: 0.7rem;
+            font-family: 'JetBrains Mono', monospace;
+            color: #64748b;
+            margin-bottom: 4px;
+        }
+
+        .history-text {
+            font-size: 0.88rem;
+            color: #e2e8f0;
+            line-height: 1.4;
+        }
+
+        .student-view {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .join-code {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #10b981;
+            letter-spacing: 10px;
+            margin: 20px 0;
+            text-shadow: 0 0 30px rgba(16, 185, 129, 0.3);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .recording-indicator {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            letter-spacing: 0.05em;
+            z-index: 10;
+        }
+
+        .recording-indicator.active {
+            display: flex;
+        }
+
+        .rec-dot {
+            width: 8px;
+            height: 8px;
+            background: #ef4444;
+            border-radius: 50%;
+            animation: blink 1.2s infinite;
+            box-shadow: 0 0 8px #ef4444;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.2;
+            }
+        }
+
+        .api-status {
+            padding: 10px;
+            border-radius: 10px;
+            margin-top: 10px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-align: center;
+            letter-spacing: 0.02em;
+            flex-shrink: 0;
+        }
+
+        .api-status.connected {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.25);
+        }
+
+        .api-status.disconnected {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.25);
+        }
+
+        /* Active Session Layout styling */
+        .main-interface.session-active {
+            /* Keep same grid layout to keep sidebar visible */
+            grid-template-columns: 350px 1fr !important;
+            gap: 24px !important;
+        }
+
+        /* Sidebar Controls Grid */
+        .sidebar .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 0;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+
+        .sidebar .controls .control-btn {
+            width: 100%;
+            padding: 10px 14px;
+            font-size: 0.85rem;
+            justify-content: center;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 0 !important;
+        }
+
+        .sidebar .controls #startBtn,
+        .sidebar .controls #stopBtn,
+        .sidebar .controls .btn-primary {
+            grid-column: span 2;
+        }
+
+        /* Hide buttons that toggle the sidebar since it is permanently visible */
+        .settings-toggle-btn {
+            display: none !important;
+        }
+
+        .sidebar-close-btn {
+            display: none !important;
+        }
+
+        /* Sidebar Collapsed State */
+        .main-interface.sidebar-collapsed {
+            grid-template-columns: 0px 1fr !important;
+            gap: 0 !important;
+        }
+
+        .main-interface.sidebar-collapsed .sidebar {
+            display: none !important;
+        }
+
+        .sidebar-close-btn.hidden {
+            display: none !important;
+        }
+
+        /* Floating Toggle Buttons */
+        .floating-toggle {
+            position: fixed;
+            background: rgba(15, 23, 42, 0.75);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            backdrop-filter: blur(12px);
+            color: #10b981;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 2000;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            outline: none;
+        }
+
+        .floating-toggle:hover {
+            background: rgba(16, 185, 129, 0.25);
+            border-color: #10b981;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+        }
+
+        .top-toggle {
+            position: fixed;
+            top: 106px;
+            /* Centered top floating toggle below header */
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        body.header-hidden .top-toggle {
+            top: 10px;
+        }
+
+        .left-toggle {
+            position: absolute;
+            left: 364px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .main-interface.sidebar-collapsed .left-toggle {
+            left: 10px;
+        }
+
+        body.header-hidden header {
+            display: none !important;
+        }
+
+        body.header-hidden .mode-selector {
+            display: none !important;
+        }
+
+        @media (max-width: 968px) {
+            .main-interface {
+                grid-template-columns: 1fr;
+                grid-template-areas:
+                    "workspace"
+                    "sidebar";
+                overflow-y: auto;
+            }
+
+            .sidebar {
+                height: auto;
+            }
+
+            body {
+                overflow: auto;
+                /* Fallback to standard scroll for small tablet layouts */
+            }
+
+            .container {
+                height: auto;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .video-container {
+                max-height: 180px !important;
+                aspect-ratio: auto !important;
+            }
+
+            .translated-text {
+                font-size: 1.5rem !important;
+                line-height: 1.3 !important;
+            }
+
+            .subtitle-box {
+                padding: 20px 15px !important;
+                min-height: 200px;
+            }
+
+            /* Force vertical layout on mobile regardless of layout state */
+            .video-section.split-layout {
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 16px !important;
+            }
+
+            .video-section.split-layout .video-container {
+                width: 100% !important;
+                max-width: 320px !important;
+                margin: 0 auto !important;
+            }
+
+            .video-section.split-layout .subtitle-overlay {
+                width: 100% !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <button id="floatingHeaderToggle" class="floating-toggle top-toggle" onclick="toggleHeader()">
+        <span class="arrow-icon">▲</span>
+    </button>
+
+    <div class="container">
+        <header>
+            <div>
+                <h1>🎓 LiveTranslate</h1>
+                <p>Real-time multilingual subtitles for online teaching</p>
+            </div>
+        </header>
+
+        <div class="mode-selector" id="modeSelector">
+            <button class="mode-btn active" onclick="selectMode('teacher')">👨‍🏫 I'm Teaching</button>
+            <button class="mode-btn" onclick="selectMode('student')">🎒 I'm Learning</button>
+        </div>
+
+        <!-- Teacher Interface -->
+        <div class="main-interface active" id="teacherInterface">
+            <button id="teacherSidebarToggle" class="floating-toggle left-toggle" onclick="toggleSidebar()">
+                <span class="arrow-icon">◀</span>
+            </button>
+            <div class="video-section">
+                <div class="video-wrapper">
+                    <div class="video-container" style="margin: 0;">
+                        <video id="teacherVideo" autoplay muted playsinline></video>
+                        <div class="recording-indicator" id="recordingIndicator">
+                            <div class="rec-dot"></div>
+                            LIVE
+                        </div>
+                    </div>
+                    <div class="video-action-area">
+                        <button class="control-btn btn-primary" id="videoStartBtn" onclick="startTeaching()">
+                            <span>▶️</span> Start Teaching
+                        </button>
+                        <button class="control-btn btn-danger hidden" id="videoStopBtn" onclick="stopTeaching()">
+                            <span>⏹️</span> Stop Teaching
+                        </button>
+                    </div>
+                </div>
+
+                <div class="subtitle-overlay" id="subtitleOverlay">
+                    <div class="subtitle-box" id="currentSubtitle" style="display: none;">
+                        <span class="language-badge" id="detectedLang">
+                            Detecting...
+                        </span>
+
+                        <div class="translated-text" id="translatedText">
+                            Translation will appear here
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 style="margin: 0;">⚙️ Settings</h3>
+                    <button class="control-btn btn-secondary sidebar-close-btn hidden" onclick="toggleSidebar()"
+                        style="padding: 5px 10px; font-size: 0.8rem; border-radius: 10px;">✕ Close</button>
+                </div>
+
+                <div class="controls">
+                    <button class="control-btn btn-primary" id="startBtn" onclick="startTeaching()">
+                        <span>▶️</span> Start Teaching
+                    </button>
+                    <button class="control-btn btn-danger hidden" id="stopBtn" onclick="stopTeaching()">
+                        <span>⏹️</span> Stop
+                    </button>
+                    <button class="control-btn btn-secondary" onclick="toggleMute()">
+                        <span id="muteIcon">🎤</span> <span id="muteText">Mute</span>
+                    </button>
+                    <button class="control-btn btn-secondary" onclick="shareScreen()">
+                        <span>🖥️</span> Share Screen
+                    </button>
+                    <button class="control-btn btn-secondary" onclick="clearSubtitles()">
+                        <span>🧹</span> Clear Subtitles
+                    </button>
+                    <button class="control-btn btn-secondary" id="pauseBtn" onclick="togglePauseSubtitles()">
+                        <span id="pauseIcon">⏸️</span> <span id="pauseText">Pause Subtitles</span>
+                    </button>
+                    <button class="control-btn btn-secondary layout-toggle-btn" onclick="toggleLayout()">
+                        <span>📖</span> Split Layout
+                    </button>
+                    <button class="control-btn btn-secondary settings-toggle-btn hidden" id="teacherSettingsToggle"
+                        onclick="toggleSidebar()">
+                        <span>⚙️</span> Settings
+                    </button>
+                </div>
+
+                <div class="form-group">
+                    <label>Your Language (Speaking)</label>
+                    <select id="teacherLang">
+                        <option value="en-US">English</option>
+                        <option value="te-IN" selected>Telugu</option>
+                        <option value="es-ES">Spanish</option>
+                        <option value="fr-FR">French</option>
+                        <option value="de-DE">German</option>
+                        <option value="zh-CN">Chinese (Simplified)</option>
+                        <option value="ja-JP">Japanese</option>
+                        <option value="ko-KR">Korean</option>
+                        <option value="hi-IN">Hindi</option>
+                        <option value="ar-SA">Arabic</option>
+                        <option value="pt-BR">Portuguese</option>
+                        <option value="ru-RU">Russian</option>
+                        <option value="it-IT">Italian</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Auto-Translate To</label>
+                    <select id="targetLang">
+                        <option value="es">Spanish</option>
+                        <option value="en" selected>English</option>
+                        <option value="te">Telugu</option>
+                        <option value="fr">French</option>
+                        <option value="de">German</option>
+                        <option value="zh">Chinese</option>
+                        <option value="ja">Japanese</option>
+                        <option value="ko">Korean</option>
+                        <option value="hi">Hindi</option>
+                        <option value="ar">Arabic</option>
+                        <option value="pt">Portuguese</option>
+                        <option value="ru">Russian</option>
+                        <option value="it">Italian</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Subtitle Font Size: <span id="fontSizeVal">2.6rem</span></label>
+                    <input type="range" id="fontSizeSlider" min="1.0" max="3.5" step="0.1" value="2.6"
+                        oninput="changeFontSize(this.value)" style="width: 100%;">
+                </div>
+
+                <div class="form-group">
+                    <label>Camera Size: <span id="cameraSizeVal">320px</span></label>
+                    <input type="range" id="cameraSizeSlider" min="200" max="600" step="10" value="320"
+                        oninput="changeCameraSize(this.value)" style="width: 100%;">
+                </div>
+
+                <div class="form-group">
+                    <label>Max Subtitle Lines: <span id="maxLinesVal">5</span></label>
+                    <input type="range" id="maxLinesSlider" min="1" max="10" step="1" value="5"
+                        oninput="changeMaxLines(this.value)" style="width: 100%;">
+                </div>
+
+                <div class="form-group">
+                    <label>Session Code</label>
+                    <input type="text" id="sessionCode" readonly value="Generating..."
+                        style="text-align: center; font-size: 1.2rem; letter-spacing: 3px;">
+                </div>
+
+                <div class="api-status disconnected" id="apiStatus">
+                    🔴 WebSocket Disconnected
+                </div>
+
+                <div class="status-indicator">
+                    <div class="status-dot" id="statusDot"></div>
+                    <span id="statusText">Ready to start</span>
+                </div>
+
+                <div class="transcript-history" id="transcriptHistory">
+                    <h3 style="margin-bottom: 15px; color: #00d4ff;">📝 Recent Transcripts</h3>
+                    <div id="historyList"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Student Interface -->
+        <div class="main-interface" id="studentInterface">
+            <button id="studentSidebarToggle" class="floating-toggle left-toggle" onclick="toggleSidebar()">
+                <span class="arrow-icon">◀</span>
+            </button>
+            <div class="video-section">
+                <div class="video-container">
+                    <video id="studentVideo" autoplay playsinline></video>
+                </div>
+
+                <div class="subtitle-overlay" id="studentSubtitleOverlay">
+                    <div class="subtitle-box" id="studentSubtitle" style="display: none;">
+                        <span class="language-badge" id="studentLangBadge">
+                            English
+                        </span>
+
+                        <div class="translated-text" id="studentTranslated">
+                            Join a session to see subtitles
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 style="margin: 0;">🎓 Student Settings</h3>
+                    <button class="control-btn btn-secondary sidebar-close-btn hidden" onclick="toggleSidebar()"
+                        style="padding: 5px 10px; font-size: 0.8rem; border-radius: 10px;">✕ Close</button>
+                </div>
+
+                <div class="controls">
+                    <button class="control-btn btn-primary" onclick="joinSession()">
+                        <span>🔗</span> Join Session
+                    </button>
+                    <button class="control-btn btn-secondary" onclick="leaveSession()">
+                        <span>🚪</span> Leave
+                    </button>
+                    <button class="control-btn btn-secondary layout-toggle-btn" onclick="toggleLayout()">
+                        <span>📖</span> Split Layout
+                    </button>
+                    <button class="control-btn btn-secondary settings-toggle-btn hidden" id="studentSettingsToggle"
+                        onclick="toggleSidebar()">
+                        <span>⚙️</span> Settings
+                    </button>
+                </div>
+
+                <div class="form-group">
+                    <label>Your Preferred Language</label>
+                    <select id="studentLang">
+                        <option value="es">Spanish</option>
+                        <option value="en" selected>English</option>
+                        <option value="fr">French</option>
+                        <option value="de">German</option>
+                        <option value="zh">Chinese</option>
+                        <option value="ja">Japanese</option>
+                        <option value="ko">Korean</option>
+                        <option value="hi">Hindi</option>
+                        <option value="ar">Arabic</option>
+                        <option value="pt">Portuguese</option>
+                        <option value="ru">Russian</option>
+                        <option value="it">Italian</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Subtitle Font Size: <span id="studentFontSizeVal">2.6rem</span></label>
+                    <input type="range" id="studentFontSizeSlider" min="1.0" max="3.5" step="0.1" value="2.6"
+                        oninput="changeStudentFontSize(this.value)" style="width: 100%;">
+                </div>
+
+                <div class="form-group">
+                    <label>Camera Size: <span id="studentCameraSizeVal">320px</span></label>
+                    <input type="range" id="studentCameraSizeSlider" min="200" max="600" step="10" value="320"
+                        oninput="changeStudentCameraSize(this.value)" style="width: 100%;">
+                </div>
+
+                <div class="form-group">
+                    <label>Max Subtitle Lines: <span id="studentMaxLinesVal">5</span></label>
+                    <input type="range" id="studentMaxLinesSlider" min="1" max="10" step="1" value="5"
+                        oninput="changeStudentMaxLines(this.value)" style="width: 100%;">
+                </div>
+
+                <div class="form-group">
+                    <label>Enter Session Code</label>
+                    <input type="text" id="joinCode" placeholder="Enter 6-digit code" maxlength="6"
+                        style="text-align: center; font-size: 1.2rem; letter-spacing: 5px; text-transform: uppercase;">
+                </div>
+
+                <div class="form-group" style="display: none;">
+                    <label>Display Mode</label>
+                    <select id="displayMode">
+                        <option value="both">Original + Translation</option>
+                        <option value="translation" selected>Translation Only</option>
+                        <option value="original">Original Only</option>
+                    </select>
+                </div>
+
+                <div class="api-status disconnected" id="studentApiStatus">
+                    🔴 Not Connected
+                </div>
+
+                <div class="status-indicator">
+                    <div class="status-dot" id="studentStatusDot"></div>
+                    <span id="studentStatusText">Enter code to join</span>
+                </div>
+
+                <div
+                    style="margin-top: 30px; padding: 20px; background: rgba(0,212,255,0.1); border-radius: 15px; border: 1px solid rgba(0,212,255,0.3);">
+                    <h4 style="color: #00d4ff; margin-bottom: 10px;">💡 How it works:</h4>
+                    <ol style="padding-left: 20px; line-height: 1.8; color: rgba(255,255,255,0.8);">
+                        <li>Enter the session code from your teacher</li>
+                        <li>Select your preferred language</li>
+                        <li>Click "Join Session"</li>
+                        <li>Subtitles will appear in real-time!</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let localStream = null;
+        let recognition = null;
+        let ws = null;
+        let isTeaching = false;
+        let currentMode = 'teacher';
+        let sessionId = null;
+        let peerConnection = null;
+        let students = new Map();
+
+        // Subtitle History (Last 4 Lines scrolling)
+        let finalizedLines = [];
+        let studentFinalizedLines = [];
+        let maxLines = 5;
+        let studentMaxLines = 5;
+
+        // WebRTC Device-to-Device Synchronization
+        let peer = null;
+        let peerConnections = [];
+
+        function logDebug(msg) {
+            console.log(msg);
+        }
+
+        function updateSubtitleDisplay(activeTranslation = '', isInterim = false) {
+            const subtitleEl = document.getElementById('translatedText');
+            let linesToShow = [...finalizedLines];
+
+            if (activeTranslation) {
+                const styledActive = isInterim
+                    ? `<span style="color: #00d4ff; font-style: italic; opacity: 0.9;">🎤 ${activeTranslation}</span>`
+                    : `<span>${activeTranslation}</span>`;
+                linesToShow.push(styledActive);
+            }
+
+            if (linesToShow.length > maxLines) {
+                linesToShow = linesToShow.slice(linesToShow.length - maxLines);
+            }
+
+            subtitleEl.innerHTML = linesToShow.map((line, idx) => {
+                const diff = linesToShow.length - 1 - idx;
+                let opacity = 1.0;
+                if (maxLines > 1) {
+                    opacity = 1.0 - (diff * (0.4 / (maxLines - 1)));
+                    if (opacity < 0.6) opacity = 0.6;
+                }
+                return `<div style="opacity: ${opacity}; line-height: 1.6; margin-bottom: 4px;">${line}</div>`;
+            }).join('');
+
+            // Auto scroll container card to bottom
+            const box = document.getElementById('currentSubtitle');
+            if (box) {
+                box.scrollTop = box.scrollHeight;
+            }
+        }
+
+        function updateStudentSubtitleDisplay(activeTranslation = '', isInterim = false) {
+            const subtitleEl = document.getElementById('studentTranslated');
+            let linesToShow = [...studentFinalizedLines];
+
+            if (activeTranslation) {
+                const styledActive = isInterim
+                    ? `<span style="color: #00d4ff; font-style: italic; opacity: 0.9;">🎤 ${activeTranslation}</span>`
+                    : `<span>${activeTranslation}</span>`;
+                linesToShow.push(styledActive);
+            }
+
+            if (linesToShow.length > studentMaxLines) {
+                linesToShow = linesToShow.slice(linesToShow.length - studentMaxLines);
+            }
+
+            subtitleEl.innerHTML = linesToShow.map((line, idx) => {
+                const diff = linesToShow.length - 1 - idx;
+                let opacity = 1.0;
+                if (studentMaxLines > 1) {
+                    opacity = 1.0 - (diff * (0.4 / (studentMaxLines - 1)));
+                    if (opacity < 0.6) opacity = 0.6;
+                }
+                return `<div style="opacity: ${opacity}; line-height: 1.6; margin-bottom: 4px;">${line}</div>`;
+            }).join('');
+
+            // Auto scroll container card to bottom
+            const box = document.getElementById('studentSubtitle');
+            if (box) {
+                box.scrollTop = box.scrollHeight;
+            }
+        }
+
+        // Generate random session code
+        function generateSessionCode() {
+            return Math.random().toString(36).substring(2, 8).toUpperCase();
+        }
+
+        // Mode selection
+        function selectMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            document.getElementById('teacherInterface').classList.toggle('active', mode === 'teacher');
+            document.getElementById('studentInterface').classList.toggle('active', mode === 'student');
+
+            if (mode === 'teacher') {
+                document.getElementById('sessionCode').value = generateSessionCode();
+            }
+
+            // Sync sidebar toggle button state for the new mode
+            const activeInterface = document.getElementById(mode + 'Interface');
+            const isCollapsed = activeInterface.classList.contains('sidebar-collapsed');
+            const toggleBtn = document.getElementById('sidebarToggle');
+            if (toggleBtn) {
+                toggleBtn.innerHTML = isCollapsed
+                    ? '<span>⚙️</span> Show Sidebar'
+                    : '<span>⚙️</span> Hide Sidebar';
+            }
+        }
+
+        let sessionChannel = null;
+
+        // Initialize WebSocket connection using BroadcastChannel and PeerJS P2P for local + device-to-device synchronization
+        function connectWebSocket(role) {
+            if (sessionChannel) {
+                sessionChannel.close();
+            }
+            if (peer) {
+                peer.destroy();
+                peer = null;
+            }
+            peerConnections = [];
+
+            sessionChannel = new BroadcastChannel(`livetranslate-session-${sessionId}`);
+
+            if (role === 'teacher') {
+                logDebug('Initializing Teacher PeerJS with ID: lt-session-' + sessionId);
+                peer = new Peer('lt-session-' + sessionId, { debug: 3 });
+
+                peer.on('open', (id) => {
+                    logDebug('Teacher PeerJS registration successful! ID: ' + id);
+                    updateConnectionStatus(true);
+                });
+
+                peer.on('connection', (conn) => {
+                    logDebug('Student connected via PeerJS: ' + conn.peer);
+                    peerConnections.push(conn);
+
+                    // Send current finalized history so student gets immediate catchup!
+                    conn.on('open', () => {
+                        logDebug('WebRTC Data Channel open for peer: ' + conn.peer);
+                        conn.send({
+                            type: 'catchup',
+                            finalizedLines: finalizedLines
+                        });
+                    });
+
+                    conn.on('close', () => {
+                        logDebug('WebRTC Peer disconnected: ' + conn.peer);
+                        peerConnections = peerConnections.filter(c => c !== conn);
+                    });
+                });
+
+                peer.on('error', (err) => {
+                    logDebug('Teacher PeerJS Error: ' + err.type + ' - ' + err.message);
+                });
+            }
+
+            if (role === 'student') {
+                const handleReceivedMessage = (data) => {
+                    logDebug('Received sync packet: ' + data.type);
+                    if (data.type === 'transcript') {
+                        if (data.finalizedLines) {
+                            studentFinalizedLines = [...data.finalizedLines];
+                        } else {
+                            studentFinalizedLines.push(data.translation);
+                            if (studentFinalizedLines.length > 15) {
+                                studentFinalizedLines.shift();
+                            }
+                        }
+                        updateStudentSubtitleDisplay();
+                    } else if (data.type === 'interim') {
+                        updateStudentSubtitleDisplay(data.translation, true);
+                    } else if (data.type === 'status') {
+                        if (data.status === 'speaking' && studentFinalizedLines.length === 0) {
+                            updateStudentSubtitleDisplay("Teacher is speaking...", true);
+                        }
+                    } else if (data.type === 'clear') {
+                        studentFinalizedLines = [];
+                        updateStudentSubtitleDisplay();
+                    } else if (data.type === 'pauseState') {
+                        if (data.paused) {
+                            updateStudentSubtitleDisplay("(Translation Paused)", true);
+                        } else {
+                            updateStudentSubtitleDisplay();
+                        }
+                    } else if (data.type === 'catchup') {
+                        if (data.finalizedLines) {
+                            studentFinalizedLines = [...data.finalizedLines];
+                            updateStudentSubtitleDisplay();
+                        }
+                    }
+                };
+
+                // 1. Listen via Local BroadcastChannel
+                sessionChannel.onmessage = (event) => {
+                    handleReceivedMessage(event.data);
+                };
+
+                // 2. Connect via PeerJS (Network/Mobile)
+                logDebug('Initializing Student PeerJS connection...');
+                peer = new Peer({ debug: 3 });
+                peer.on('open', (id) => {
+                    logDebug('Student PeerJS registered with ID: ' + id);
+                    logDebug('Attempting WebRTC connection to Teacher: lt-session-' + sessionId);
+                    const conn = peer.connect('lt-session-' + sessionId);
+                    peerConnections.push(conn);
+
+                    conn.on('open', () => {
+                        logDebug('WebRTC connection established with Teacher!');
+                        updateConnectionStatus(true);
+                        document.getElementById('studentStatusText').textContent = 'Connected to session ' + sessionId;
+                    });
+
+                    conn.on('data', (data) => {
+                        handleReceivedMessage(data);
+                    });
+
+                    conn.on('close', () => {
+                        logDebug('WebRTC connection closed by teacher.');
+                        updateConnectionStatus(false);
+                        document.getElementById('studentStatusText').textContent = 'Session ended by teacher';
+                    });
+
+                    conn.on('error', (err) => {
+                        logDebug('WebRTC Connection error: ' + err);
+                    });
+                });
+
+                peer.on('error', (err) => {
+                    logDebug('Student PeerJS Error: ' + err.type + ' - ' + err.message);
+                });
+            }
+
+            ws = {
+                send: function (data) {
+                    console.log('Sending:', data);
+                    if (sessionChannel) {
+                        sessionChannel.postMessage(data);
+                    }
+                    peerConnections.forEach((conn) => {
+                        if (conn.open) {
+                            conn.send(data);
+                        }
+                    });
+                },
+                close: function () {
+                    console.log('WebSocket closed');
+                    if (sessionChannel) {
+                        sessionChannel.close();
+                        sessionChannel = null;
+                    }
+                    if (peer) {
+                        peer.destroy();
+                        peer = null;
+                    }
+                    peerConnections = [];
+                }
+            };
+
+            updateConnectionStatus(true);
+            return ws;
+        }
+
+
+
+        function updateConnectionStatus(connected) {
+            const statusEl = currentMode === 'teacher' ? document.getElementById('apiStatus') : document.getElementById('studentApiStatus');
+            if (connected) {
+                statusEl.className = 'api-status connected';
+                statusEl.textContent = '🟢 Connected';
+            } else {
+                statusEl.className = 'api-status disconnected';
+                statusEl.textContent = '🔴 Disconnected';
+            }
+        }
+
+        // Start teaching
+        async function startTeaching() {
+            try {
+                // Progressively request video-only with safe constraints (prevent mic resource conflicts)
+                try {
+                    localStream = await navigator.mediaDevices.getUserMedia({
+                        video: true,
+                        audio: false // Do not capture audio here to prevent conflicts with SpeechRecognition
+                    });
+                } catch (videoErr) {
+                    logDebug("Could not get local camera stream. Continuing in text-only mode...");
+                    localStream = null;
+                    document.getElementById('teacherVideo').style.display = 'none';
+                }
+
+                const video = document.getElementById('teacherVideo');
+                if (localStream.getVideoTracks().length > 0) {
+                    video.srcObject = localStream;
+                    video.style.display = 'block';
+                } else {
+                    video.srcObject = null;
+                    video.style.display = 'none';
+                }
+
+                // Generate session
+                sessionId = document.getElementById('sessionCode').value;
+
+                // Connect WebSocket
+                connectWebSocket('teacher');
+
+                // Initialize speech recognition
+                initSpeechRecognition();
+
+                // Update UI
+                document.getElementById('startBtn').classList.add('hidden');
+                document.getElementById('stopBtn').classList.remove('hidden');
+
+                // Sync video-side buttons
+                const vStart = document.getElementById('videoStartBtn');
+                const vStop = document.getElementById('videoStopBtn');
+                if (vStart) vStart.classList.add('hidden');
+                if (vStop) vStop.classList.remove('hidden');
+
+                document.getElementById('recordingIndicator').classList.add('active');
+                document.getElementById('currentSubtitle').style.display = 'block';
+                document.getElementById('statusDot').classList.add('active');
+                document.getElementById('statusText').textContent = 'Live - Students can join now';
+
+                document.getElementById('teacherInterface').classList.add('session-active');
+                document.getElementById('teacherSettingsToggle').classList.remove('hidden');
+                document.getElementById('teacherInterface').querySelector('.sidebar-close-btn').classList.remove('hidden');
+
+                finalizedLines = [];
+                updateSubtitleDisplay();
+
+                // Set initial target language badge
+                const targetLangSelect = document.getElementById('targetLang');
+                document.getElementById('detectedLang').textContent = targetLangSelect.options[targetLangSelect.selectedIndex].text;
+
+                isTeaching = true;
+
+                // Start speech recognition
+                recognition.start();
+
+                // Auto hide header when teaching starts
+                if (!document.body.classList.contains('header-hidden')) {
+                    toggleHeader();
+                }
+
+            } catch (err) {
+                console.error('Error starting teaching:', err);
+                alert('Error accessing camera/microphone. Please allow permissions.');
+            }
+        }
+
+        let interimTranslationTimeout = null;
+        let lastInterimTranslationTime = 0;
+
+        function translateInterim(text, sourceLang, targetLang, callback) {
+            const now = Date.now();
+            const delay = 250; // 250ms throttle for rapid real-time translation
+
+            if (interimTranslationTimeout) {
+                clearTimeout(interimTranslationTimeout);
+            }
+
+            const performTranslation = async () => {
+                lastInterimTranslationTime = Date.now();
+                try {
+                    const translation = await translateText(text, sourceLang, targetLang);
+                    callback(translation);
+                } catch (e) {
+                    console.error("Interim translation error:", e);
+                }
+            };
+
+            if (now - lastInterimTranslationTime >= delay) {
+                performTranslation();
+            } else {
+                interimTranslationTimeout = setTimeout(performTranslation, delay - (now - lastInterimTranslationTime));
+            }
+        }
+
+        // Initialize Web Speech API
+        function initSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+            if (!SpeechRecognition) {
+                logDebug('Error: Speech recognition not supported in this browser!');
+                alert('Speech recognition not supported in this browser. Please use Chrome.');
+                return;
+            }
+
+            logDebug('Initializing Web Speech API. Lang: ' + document.getElementById('teacherLang').value);
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = document.getElementById('teacherLang').value;
+
+            recognition.onstart = () => {
+                logDebug('Microphone listening started successfully.');
+            };
+
+            recognition.onresult = async (event) => {
+                let finalTranscript = '';
+                let interimTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript;
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+
+                const targetLang = document.getElementById('targetLang').value;
+                const detectedLang = document.getElementById('teacherLang').value.split('-')[0];
+
+                if (finalTranscript) {
+                    if (isPaused) return;
+                    logDebug('Speech detected (Final): "' + finalTranscript + '"');
+                    if (interimTranslationTimeout) {
+                        clearTimeout(interimTranslationTimeout);
+                    }
+                    await processTranscript(finalTranscript);
+                } else if (interimTranscript) {
+                    if (isPaused) return;
+                    logDebug('Speech detected (Interim): "' + interimTranscript + '"');
+                    // Update interim translation on-the-fly
+                    translateInterim(interimTranscript, detectedLang, targetLang, (translatedText) => {
+                        updateSubtitleDisplay(translatedText, true);
+
+                        // Broadcast interim translation so students see instant updates directly
+                        if (ws) {
+                            ws.send({
+                                type: 'interim',
+                                translation: translatedText
+                            });
+                        }
+                    });
+                }
+            };
+
+            recognition.onerror = (event) => {
+                logDebug('Speech Recognition Error: ' + event.error);
+                document.getElementById('statusText').textContent = `Mic Status: Error (${event.error}). Reconnecting...`;
+                if (event.error === 'not-allowed') {
+                    alert('Microphone access denied.');
+                } else if (event.error === 'service-not-allowed' || event.error === 'network') {
+                    alert('Google Speech Recognition service is blocked or unavailable inside standalone Electron apps by default. Please run this app inside the Google Chrome browser (or launch run_app.bat) for translation to work.');
+                }
+            };
+
+            recognition.onend = () => {
+                logDebug('Speech Recognition engine ended.');
+                if (isTeaching) {
+                    // Update language setting dynamically on restart
+                    try {
+                        recognition.lang = document.getElementById('teacherLang').value;
+                        recognition.start(); // Restart if still teaching
+                        logDebug('Speech Recognition restarted.');
+                        document.getElementById('statusText').textContent = 'Live - Students can join now';
+                    } catch (e) {
+                        console.warn("Failed to restart speech recognition immediately. Retrying in 200ms...", e);
+                        setTimeout(() => {
+                            if (isTeaching) {
+                                try {
+                                    recognition.start();
+                                    logDebug('Speech Recognition restarted (retry).');
+                                    document.getElementById('statusText').textContent = 'Live - Students can join now';
+                                } catch (err) {
+                                    logDebug('Critical: Failed to restart Speech Recognition: ' + err.message);
+                                    console.error("Failed to restart speech recognition on retry:", err);
+                                    document.getElementById('statusText').textContent = 'Mic stopped. Click Stop and Start to reset.';
+                                }
+                            }
+                        }, 200);
+                    }
+                }
+            };
+        }
+
+        // Process transcript with translation
+        async function processTranscript(text) {
+            const targetLang = document.getElementById('targetLang').value;
+            const detectedLang = document.getElementById('teacherLang').value;
+
+            try {
+                logDebug('Translating final text: "' + text.substring(0, 30) + '..."');
+                const translation = await translateText(
+                    text,
+                    detectedLang.split('-')[0],
+                    targetLang
+                );
+
+                finalizedLines.push(translation);
+                if (finalizedLines.length > 15) {
+                    finalizedLines.shift();
+                }
+                updateSubtitleDisplay();
+
+                // Dynamically update the target language badge text
+                const targetLangSelect = document.getElementById('targetLang');
+                document.getElementById('detectedLang').textContent = targetLangSelect.options[targetLangSelect.selectedIndex].text;
+
+                // Broadcast transcript to student session
+                if (ws) {
+                    ws.send({
+                        type: 'transcript',
+                        translation: translation,
+                        finalizedLines: finalizedLines
+                    });
+                }
+
+                addToHistory(text, translation);
+            } catch (err) {
+                console.error("Translation processing error:", err);
+            }
+        }
+        // Fetch helper with timeout
+        async function fetchWithTimeout(resource, options = {}) {
+            const { timeout = 3500 } = options;
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), timeout);
+            try {
+                const response = await fetch(resource, {
+                    ...options,
+                    signal: controller.signal
+                });
+                clearTimeout(id);
+                return response;
+            } catch (error) {
+                clearTimeout(id);
+                throw error;
+            }
+        }
+
+        // Translation function using Google Translate API (Fallback Chain with Timeout)
+        async function translateText(text, sourceLang, targetLang) {
+            // Use 'auto' as the source language to properly translate mixed-language speech and handle settings mismatches
+            const sl = 'auto';
+
+            // Try to use Google Translate clients5 API (primary)
+            try {
+                const response = await fetchWithTimeout(`https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=${sl}&tl=${targetLang}&q=${encodeURIComponent(text)}`, { timeout: 3500 });
+                const data = await response.json();
+                if (data && data[0]) {
+                    // When sl=auto is used, clients5 API returns [ [translation, detectedLang] ] instead of [ translation ]
+                    return Array.isArray(data[0]) ? data[0][0] : data[0];
+                }
+            } catch (e) {
+                console.warn("Primary translation API failed, trying fallback...", e);
+            }
+
+            // Fallback to translate.googleapis.com single API
+            try {
+                const response = await fetchWithTimeout(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`, { timeout: 3500 });
+                const data = await response.json();
+                if (data && data[0]) {
+                    // Concatenate all segment translations for complete sentence accuracy
+                    return data[0].map(segment => segment[0]).filter(Boolean).join('');
+                }
+                return `[${targetLang.toUpperCase()}] ${text}`;
+            } catch (e) {
+                return `[${targetLang.toUpperCase()}] ${text}`; // Fallback
+            }
+        }
+
+        // Add to transcript history
+        function addToHistory(original, translation) {
+            const historyList = document.getElementById('historyList');
+            const time = new Date().toLocaleTimeString();
+
+            const item = document.createElement('div');
+            item.className = 'history-item';
+            item.innerHTML = `
+                <div class="history-time">${time}</div>
+                <div class="history-text">${translation}</div>
+            `;
+
+            historyList.insertBefore(item, historyList.firstChild);
+
+            // Keep only last 10 items
+            while (historyList.children.length > 10) {
+                historyList.removeChild(historyList.lastChild);
+            }
+        }
+
+        // Stop teaching
+        function stopTeaching() {
+            isTeaching = false;
+            finalizedLines = [];
+
+            if (recognition) {
+                recognition.stop();
+            }
+
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+            }
+
+            if (ws) {
+                ws.close();
+            }
+
+            document.getElementById('teacherVideo').srcObject = null;
+            document.getElementById('startBtn').classList.remove('hidden');
+            document.getElementById('stopBtn').classList.add('hidden');
+
+            // Sync video-side buttons
+            const vStart = document.getElementById('videoStartBtn');
+            const vStop = document.getElementById('videoStopBtn');
+            if (vStart) vStart.classList.remove('hidden');
+            if (vStop) vStop.classList.add('hidden');
+
+            document.getElementById('recordingIndicator').classList.remove('active');
+            document.getElementById('currentSubtitle').style.display = 'none';
+            document.getElementById('statusDot').classList.remove('active');
+            document.getElementById('statusText').textContent = 'Session ended';
+
+            const teacherInt = document.getElementById('teacherInterface');
+            teacherInt.classList.remove('session-active');
+            teacherInt.querySelector('.sidebar').classList.remove('open');
+            document.getElementById('teacherSettingsToggle').classList.add('hidden');
+            teacherInt.querySelector('.sidebar-close-btn').classList.add('hidden');
+
+            if (isPaused) {
+                togglePauseSubtitles();
+            }
+
+            updateConnectionStatus(false);
+
+            // Auto show header when teaching stops
+            if (document.body.classList.contains('header-hidden')) {
+                toggleHeader();
+            }
+        }
+
+        // Toggle mute
+        function toggleMute() {
+            if (localStream) {
+                const audioTrack = localStream.getAudioTracks()[0];
+                if (audioTrack) {
+                    audioTrack.enabled = !audioTrack.enabled;
+                    document.getElementById('muteIcon').textContent = audioTrack.enabled ? '🎤' : '🎤❌';
+                    document.getElementById('muteText').textContent = audioTrack.enabled ? 'Mute' : 'Unmute';
+                }
+            }
+        }
+
+        // Share screen
+        async function shareScreen() {
+            try {
+                const screenStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: true,
+                    audio: true
+                });
+
+                const video = document.getElementById('teacherVideo');
+                video.srcObject = screenStream;
+
+                screenStream.getVideoTracks()[0].onended = () => {
+                    video.srcObject = localStream;
+                };
+
+            } catch (err) {
+                console.error('Error sharing screen:', err);
+            }
+        }
+
+        // Clear all subtitle history
+        function clearSubtitles() {
+            finalizedLines = [];
+            updateSubtitleDisplay();
+
+            // Broadcast clear command to students
+            if (ws) {
+                ws.send({
+                    type: 'clear'
+                });
+            }
+        }
+
+        // Student functions
+        async function joinSession() {
+            const code = document.getElementById('joinCode').value.toUpperCase();
+            if (code.length !== 6) {
+                alert('Please enter a valid 6-digit session code');
+                return;
+            }
+
+            sessionId = code;
+
+            try {
+                // Get student video (optional, for participation)
+                try {
+                    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                    document.getElementById('studentVideo').srcObject = localStream;
+                } catch (camErr) {
+                    console.warn("Camera access not available or blocked (common on HTTP local network mobile devices). Continuing in text-only subtitle mode...", camErr);
+                    // Hide student video element since there's no stream
+                    document.getElementById('studentVideo').style.display = 'none';
+                }
+
+                // Connect to session
+                connectWebSocket('student');
+                studentFinalizedLines = [];
+                updateStudentSubtitleDisplay("Connected! Waiting for teacher...", true);
+
+                document.getElementById('studentInterface').classList.add('session-active');
+                document.getElementById('studentSettingsToggle').classList.remove('hidden');
+                document.getElementById('studentInterface').querySelector('.sidebar-close-btn').classList.remove('hidden');
+
+                // Simulate receiving data from teacher ONLY if they join with the DEMO12 code
+                if (code === 'DEMO12') {
+                    startStudentSimulation();
+                }
+
+                document.getElementById('studentSubtitle').style.display = 'block';
+
+                // Auto hide header when session starts
+                if (!document.body.classList.contains('header-hidden')) {
+                    toggleHeader();
+                }
+
+            } catch (err) {
+                console.error('Error joining session:', err);
+                alert('Error joining session. Please check your camera permissions.');
+            }
+        }
+
+        function leaveSession() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+            }
+            studentFinalizedLines = [];
+            document.getElementById('studentVideo').srcObject = null;
+            document.getElementById('studentStatusDot').classList.remove('active');
+            document.getElementById('studentStatusText').textContent = 'Enter code to join';
+            document.getElementById('studentSubtitle').style.display = 'none';
+
+            const studentInt = document.getElementById('studentInterface');
+            studentInt.classList.remove('session-active');
+            studentInt.querySelector('.sidebar').classList.remove('open');
+            document.getElementById('studentSettingsToggle').classList.add('hidden');
+            studentInt.querySelector('.sidebar-close-btn').classList.add('hidden');
+
+            updateConnectionStatus(false);
+
+            // Clean up PeerJS on leave
+            if (peer) {
+                peer.destroy();
+                peer = null;
+            }
+            peerConnections = [];
+
+            // Auto show header when session ends
+            if (document.body.classList.contains('header-hidden')) {
+                toggleHeader();
+            }
+        }
+
+        // Simulate receiving transcript as student (for demo)
+        function broadcastToStudents(data) {
+            console.log('Broadcasting to students:', data);
+        }
+
+        function startStudentSimulation() {
+            // Simulate receiving transcripts every few seconds
+            const demoTexts = [
+                { original: "Hello everyone, welcome to today's class!", translation: "Hello everyone, welcome to today's class!" },
+                { original: "Today we will learn about photosynthesis.", translation: "Today we will learn about photosynthesis." },
+                { original: "Please open your textbooks to page 45.", translation: "Please open your textbooks to page 45." }
+            ];
+
+            let index = 0;
+            const interval = setInterval(() => {
+                if (!document.getElementById('studentStatusDot').classList.contains('active')) {
+                    clearInterval(interval);
+                    return;
+                }
+
+                const text = demoTexts[index % demoTexts.length];
+                displayStudentSubtitle(text.original, text.translation);
+                index++;
+            }, 5000);
+        }
+
+        function displayStudentSubtitle(original, translation) {
+            const studentLang = document.getElementById('studentLang').value;
+
+            document.getElementById('studentLangBadge').textContent = studentLang.toUpperCase();
+
+            studentFinalizedLines.push(translation);
+            if (studentFinalizedLines.length > 10) {
+                studentFinalizedLines.shift();
+            }
+            updateStudentSubtitleDisplay();
+        }
+
+        // Initialize
+        document.getElementById('sessionCode').value = generateSessionCode();
+
+        // Handle Enter key in join code
+        document.getElementById('joinCode').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') joinSession();
+        });
+
+        // Dynamic Settings Change Listeners
+        document.getElementById('teacherLang').addEventListener('change', () => {
+            if (isTeaching && recognition) {
+                recognition.stop(); // This triggers onend which restarts with new lang
+            }
+        });
+
+        document.getElementById('targetLang').addEventListener('change', () => {
+            if (isTeaching) {
+                const targetLangSelect = document.getElementById('targetLang');
+                document.getElementById('detectedLang').textContent = targetLangSelect.options[targetLangSelect.selectedIndex].text;
+            }
+        });
+
+        function toggleLayout() {
+            const sections = document.querySelectorAll('.video-section');
+            sections.forEach(sec => {
+                sec.classList.toggle('split-layout');
+            });
+
+            const isSplit = sections[0].classList.contains('split-layout');
+            localStorage.setItem('layoutPreference', isSplit ? 'split' : 'default');
+            updateLayoutButtonText(isSplit);
+        }
+
+        function updateLayoutButtonText(isSplit) {
+            const btns = document.querySelectorAll('.layout-toggle-btn');
+            btns.forEach(btn => {
+                btn.innerHTML = isSplit
+                    ? '<span>🥞</span> Stack Layout'
+                    : '<span>📖</span> Split Layout';
+            });
+        }
+
+        let isPaused = false;
+        function togglePauseSubtitles() {
+            isPaused = !isPaused;
+            const icon = document.getElementById('pauseIcon');
+            const text = document.getElementById('pauseText');
+            const btn = document.getElementById('pauseBtn');
+
+            if (isPaused) {
+                icon.textContent = '▶️';
+                text.textContent = 'Resume Subtitles';
+                btn.style.background = 'linear-gradient(45deg, #ff9f43, #ff6b6b)';
+                updateSubtitleDisplay("(Translation Paused)", true);
+            } else {
+                icon.textContent = '⏸️';
+                text.textContent = 'Pause Subtitles';
+                btn.style.background = 'rgba(255, 255, 255, 0.1)';
+                updateSubtitleDisplay();
+            }
+
+            if (ws) {
+                ws.send({
+                    type: 'pauseState',
+                    paused: isPaused
+                });
+            }
+        }
+
+        function changeFontSize(val) {
+            document.getElementById('fontSizeVal').textContent = val + 'rem';
+            document.getElementById('translatedText').style.fontSize = val + 'rem';
+            localStorage.setItem('subtitleFontSize', val);
+        }
+
+        function changeStudentFontSize(val) {
+            document.getElementById('studentFontSizeVal').textContent = val + 'rem';
+            document.getElementById('studentTranslated').style.fontSize = val + 'rem';
+            localStorage.setItem('studentSubtitleFontSize', val);
+        }
+
+        function changeCameraSize(val) {
+            const containers = document.querySelectorAll('.video-container');
+            containers.forEach(container => {
+                container.style.maxWidth = val + 'px';
+            });
+            const sizeVal = document.getElementById('cameraSizeVal');
+            if (sizeVal) sizeVal.textContent = val + 'px';
+            localStorage.setItem('cameraSize', val);
+        }
+
+        function changeStudentCameraSize(val) {
+            const containers = document.querySelectorAll('.video-container');
+            containers.forEach(container => {
+                container.style.maxWidth = val + 'px';
+            });
+            const sizeVal = document.getElementById('studentCameraSizeVal');
+            if (sizeVal) sizeVal.textContent = val + 'px';
+            localStorage.setItem('studentCameraSize', val);
+        }
+
+        function changeMaxLines(val) {
+            maxLines = parseInt(val);
+            const valEl = document.getElementById('maxLinesVal');
+            if (valEl) valEl.textContent = val;
+            localStorage.setItem('maxLines', val);
+            updateSubtitleDisplay();
+        }
+
+        function changeStudentMaxLines(val) {
+            studentMaxLines = parseInt(val);
+            const valEl = document.getElementById('studentMaxLinesVal');
+            if (valEl) valEl.textContent = val;
+            localStorage.setItem('studentMaxLines', val);
+            updateStudentSubtitleDisplay();
+        }
+
+        function toggleHeader() {
+            document.body.classList.toggle('header-hidden');
+            const isHidden = document.body.classList.contains('header-hidden');
+            localStorage.setItem('headerHidden', isHidden);
+
+            const btn = document.getElementById('floatingHeaderToggle');
+            if (btn) {
+                btn.querySelector('.arrow-icon').textContent = isHidden ? '▼' : '▲';
+            }
+        }
+
+        function toggleSidebar() {
+            const activeInterface = currentMode === 'teacher'
+                ? document.getElementById('teacherInterface')
+                : document.getElementById('studentInterface');
+
+            activeInterface.classList.toggle('sidebar-collapsed');
+
+            const isCollapsed = activeInterface.classList.contains('sidebar-collapsed');
+            localStorage.setItem(currentMode + 'SidebarCollapsed', isCollapsed);
+
+            // Sync all sidebar toggles arrow indicators
+            const teacherToggle = document.getElementById('teacherSidebarToggle');
+            const studentToggle = document.getElementById('studentSidebarToggle');
+
+            if (teacherToggle) {
+                teacherToggle.querySelector('.arrow-icon').textContent =
+                    document.getElementById('teacherInterface').classList.contains('sidebar-collapsed') ? '▶' : '◀';
+            }
+            if (studentToggle) {
+                studentToggle.querySelector('.arrow-icon').textContent =
+                    document.getElementById('studentInterface').classList.contains('sidebar-collapsed') ? '▶' : '◀';
+            }
+        }
+
+        // Apply layout preference and custom font sizes on load
+        window.addEventListener('DOMContentLoaded', () => {
+            const pref = localStorage.getItem('layoutPreference');
+            if (pref === 'split') {
+                const sections = document.querySelectorAll('.video-section');
+                sections.forEach(sec => sec.classList.add('split-layout'));
+                updateLayoutButtonText(true);
+            }
+
+            const savedSize = localStorage.getItem('subtitleFontSize');
+            if (savedSize) {
+                const slider = document.getElementById('fontSizeSlider');
+                if (slider) slider.value = savedSize;
+                changeFontSize(savedSize);
+            }
+
+            const savedStudentSize = localStorage.getItem('studentSubtitleFontSize');
+            if (savedStudentSize) {
+                const slider = document.getElementById('studentFontSizeSlider');
+                if (slider) slider.value = savedStudentSize;
+                changeStudentFontSize(savedStudentSize);
+            }
+
+            const savedCameraSize = localStorage.getItem('cameraSize');
+            if (savedCameraSize) {
+                const slider = document.getElementById('cameraSizeSlider');
+                if (slider) slider.value = savedCameraSize;
+                changeCameraSize(savedCameraSize);
+            }
+
+            const savedStudentCameraSize = localStorage.getItem('studentCameraSize');
+            if (savedStudentCameraSize) {
+                const slider = document.getElementById('studentCameraSizeSlider');
+                if (slider) slider.value = savedStudentCameraSize;
+                changeStudentCameraSize(savedStudentCameraSize);
+            }
+
+            const savedMaxLines = localStorage.getItem('maxLines');
+            if (savedMaxLines) {
+                const slider = document.getElementById('maxLinesSlider');
+                if (slider) slider.value = savedMaxLines;
+                changeMaxLines(savedMaxLines);
+            }
+
+            const savedStudentMaxLines = localStorage.getItem('studentMaxLines');
+            if (savedStudentMaxLines) {
+                const slider = document.getElementById('studentMaxLinesSlider');
+                if (slider) slider.value = savedStudentMaxLines;
+                changeStudentMaxLines(savedStudentMaxLines);
+            }
+
+            // Restore sidebar collapse state preference
+            const sidebarPref = localStorage.getItem(currentMode + 'SidebarCollapsed');
+            if (sidebarPref === 'true') {
+                const activeInterface = document.getElementById(currentMode + 'Interface');
+                if (activeInterface) {
+                    activeInterface.classList.add('sidebar-collapsed');
+                }
+            }
+
+            // Set correct arrow icons on load
+            const teacherToggle = document.getElementById('teacherSidebarToggle');
+            const studentToggle = document.getElementById('studentSidebarToggle');
+            if (teacherToggle) {
+                teacherToggle.querySelector('.arrow-icon').textContent =
+                    document.getElementById('teacherInterface').classList.contains('sidebar-collapsed') ? '▶' : '◀';
+            }
+            if (studentToggle) {
+                studentToggle.querySelector('.arrow-icon').textContent =
+                    document.getElementById('studentInterface').classList.contains('sidebar-collapsed') ? '▶' : '◀';
+            }
+
+            // Restore header collapse state preference
+            const headerPref = localStorage.getItem('headerHidden');
+            if (headerPref === 'true') {
+                document.body.classList.add('header-hidden');
+                const btn = document.getElementById('floatingHeaderToggle');
+                if (btn) btn.querySelector('.arrow-icon').textContent = '▼';
+            } else {
+                const btn = document.getElementById('floatingHeaderToggle');
+                if (btn) btn.querySelector('.arrow-icon').textContent = '▲';
+            }
+
+            // Register PWA Service Worker
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('sw.js')
+                    .then(() => console.log('PWA Service Worker Registered'))
+                    .catch((err) => console.log('Service Worker Registration Failed:', err));
+            }
+        });
+    </script>
+</body>
+
+</html>
