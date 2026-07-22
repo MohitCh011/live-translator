@@ -308,7 +308,7 @@
 
                 <!-- Section 2: Subtitle Customizations -->
                 <div class="settings-section">
-                    <h3>2. Subtitle Window Preferences</h3>
+                    <h3>3. Subtitle Window Preferences</h3>
                     
                     <div class="settings-grid">
                         <div class="settings-control">
@@ -328,6 +328,18 @@
                                 <input type="range" id="settings-bg-opacity" min="20" max="100" value="75">
                                 <span class="range-val" id="bg-opacity-val">75%</span>
                             </div>
+                        </div>
+
+                        <div class="settings-control">
+                            <label for="settings-translation-delay">Translation Delay (Frequency)</label>
+                            <select id="settings-translation-delay">
+                                <option value="2">2 seconds (Instant / Fastest)</option>
+                                <option value="3">3 seconds (Fast)</option>
+                                <option value="5" selected>5 seconds (Normal / Balanced)</option>
+                                <option value="8">8 seconds (Slow / Better context)</option>
+                                <option value="10">10 seconds (Full sentences)</option>
+                            </select>
+                            <div class="help-desc" style="font-size: 0.8rem; opacity: 0.6; margin-top: 0.25rem;">Lower delay gives faster translation, higher delay gives more accurate sentence translation.</div>
                         </div>
 
                         <div class="settings-control checkbox-control">

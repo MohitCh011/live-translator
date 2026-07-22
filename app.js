@@ -25,6 +25,7 @@ const state = {
         geminiKey: '',
         openaiKey: '',
         sourceLang: 'te-IN',
+        translationDelay: 5, // Default translation delay in seconds
         fontSize: '1.6rem',
         bgOpacity: 75,
         autoRestart: true
@@ -73,6 +74,7 @@ const elements = {
     inputOpenaiKey: document.getElementById('openai-key'),
     selectSourceLang: document.getElementById('settings-source-lang'),
     selectFontSize: document.getElementById('settings-font-size'),
+    selectTranslationDelay: document.getElementById('settings-translation-delay'),
     inputBgOpacity: document.getElementById('settings-bg-opacity'),
     bgOpacityVal: document.getElementById('bg-opacity-val'),
     checkAutoRestart: document.getElementById('settings-auto-restart'),
@@ -134,6 +136,9 @@ function loadSettings() {
     if (elements.selectSourceLang) {
         elements.selectSourceLang.value = state.settings.sourceLang || 'te-IN';
     }
+    if (elements.selectTranslationDelay) {
+        elements.selectTranslationDelay.value = state.settings.translationDelay || 5;
+    }
     elements.selectFontSize.value = state.settings.fontSize || '1.6rem';
     elements.inputBgOpacity.value = state.settings.bgOpacity || 75;
     elements.bgOpacityVal.textContent = `${state.settings.bgOpacity || 75}%`;
@@ -161,6 +166,9 @@ function saveSettings() {
     state.settings.openaiKey = elements.inputOpenaiKey.value.trim();
     if (elements.selectSourceLang) {
         state.settings.sourceLang = elements.selectSourceLang.value;
+    }
+    if (elements.selectTranslationDelay) {
+        state.settings.translationDelay = parseInt(elements.selectTranslationDelay.value, 10) || 5;
     }
     state.settings.fontSize = elements.selectFontSize.value;
     state.settings.bgOpacity = parseInt(elements.inputBgOpacity.value, 10);
@@ -347,7 +355,7 @@ function periodicBufferCheck() {
     
     const now = Date.now();
     const timeSinceLast = now - state.lastTranslationTime;
-    const minInterval = 4500; // 4.5 seconds safety window (15 RPM protection)
+    const minInterval = (state.settings.translationDelay || 5) * 1000;
     
     if (timeSinceLast >= minInterval) {
         const textToTranslate = state.teluguBuffer;
@@ -364,9 +372,9 @@ function startListening() {
         state.recognition.lang = state.settings.sourceLang || 'te-IN'; // Apply current language preference
         state.recognition.start();
         
-        // Start the periodic buffer check loop (every 3 seconds)
+        // Start the periodic buffer check loop (every 1 second for high responsiveness)
         if (state.translationInterval) clearInterval(state.translationInterval);
-        state.translationInterval = setInterval(periodicBufferCheck, 3000);
+        state.translationInterval = setInterval(periodicBufferCheck, 1000);
     } catch (e) {
         console.error('Failed to start recognition:', e);
         state.isListening = false;
