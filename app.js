@@ -673,6 +673,7 @@ Telugu transcript to translate: "${text}"`;
                     // If rate limit exceeded, we break and try the next key immediately!
                     if (errStatus === 429) {
                         lastError = new Error(`Rate limit hit on key index ${keyIndex}. Trying next key...`);
+                        state.currentGeminiKeyIndex = (keyIndex + 1) % keys.length; // Advance immediately to skip blocked key on next call
                         break; // Breaks endpoints loop to try the next key
                     }
 
