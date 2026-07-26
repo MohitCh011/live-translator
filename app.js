@@ -256,6 +256,7 @@ function initSpeechRecognition() {
     
     recognition.onstart = () => {
         state.isListening = true;
+        state.lastProcessedResultIndex = -1; // Reset segment tracking for the new speech session
         updateListeningUI(true);
         startSessionTimer();
         
