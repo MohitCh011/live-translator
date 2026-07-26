@@ -358,18 +358,11 @@ function initSpeechRecognition() {
         } else {
             const cleanInterim = interimTranscript.trim();
             if (cleanInterim.length > 0) {
-                // We have active speech! Update interim subtitles
-                const engine = state.settings.engine;
-                if (engine === 'googleweb' || engine === 'local') {
-                    // Update Telugu immediately, translate English with a throttle
-                    updateInterimSubtitles(cleanInterim, '...');
-                    translateInterim(cleanInterim, (translatedText) => {
-                        updateInterimSubtitles(cleanInterim, translatedText);
-                    });
-                } else {
-                    // For Gemini/OpenAI, show the live Telugu text instantly, but avoid API key rate limits
-                    updateInterimSubtitles(cleanInterim, '...');
-                }
+                // Update Telugu immediately, translate English with a throttle
+                updateInterimSubtitles(cleanInterim, '...');
+                translateInterim(cleanInterim, (translatedText) => {
+                    updateInterimSubtitles(cleanInterim, translatedText);
+                });
             }
         }
     };
@@ -900,7 +893,10 @@ let lastInterimTranslationTime = 0;
 
 function translateInterim(text, callback) {
     const now = Date.now();
-    const delay = 350; // 350ms throttle to prevent API spam
+    
+    // Choose delay dynamically to avoid rate limiting API keys (350ms for free/local, 2000ms for Gemini/OpenAI)
+    const engine = state.settings.engine;
+    const delay = (engine === 'googleweb' || engine === 'local') ? 350 : 2000;
 
     if (interimTranslationTimeout) {
         clearTimeout(interimTranslationTimeout);
