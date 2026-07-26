@@ -354,18 +354,22 @@ function initSpeechRecognition() {
         
         const cleanFinal = finalTranscript.trim();
         if (cleanFinal.length > 0) {
+            // Get the last known interim English text before removing it (to prevent screen blinking)
+            const interimEnglish = document.querySelector('#interim-subtitle-line .subtitle-english')?.textContent || '';
+            
             // Remove the temporary interim line from UI as final is ready
             removeInterimSubtitles();
             
             // If delay is set to 2s, we bypass the buffering loop and translate immediately
             if ((state.settings.translationDelay || 5) <= 2) {
-                handleFinalTeluguSentence(cleanFinal);
+                handleFinalTeluguSentence(cleanFinal, interimEnglish);
             } else {
                 // Append to buffer to wait for sentence formation
                 state.teluguBuffer = (state.teluguBuffer + ' ' + cleanFinal).trim();
                 console.log('Buffered Telugu:', state.teluguBuffer);
             }
-        } else {
+        }
+ else {
             const cleanInterim = interimTranscript.trim();
             if (cleanInterim.length > 0) {
                 // Update Telugu immediately, but pass null for English to preserve the previous translation while generating
@@ -490,11 +494,11 @@ function stopSessionTimer() {
 }
 
 // --- Translation Core ---
-async function handleFinalTeluguSentence(teluguText) {
+async function handleFinalTeluguSentence(teluguText, initialEnglish = '') {
     console.log('Received Telugu Speech:', teluguText);
     
     // Show a loading indicator in the subtitles list with the Telugu text on top
-    const tempLineId = addSubtitlePlaceholder(teluguText);
+    const tempLineId = addSubtitlePlaceholder(teluguText, initialEnglish);
     
     try {
         const translatedText = await translateTeluguToEnglish(teluguText, (progressText) => {
@@ -851,17 +855,17 @@ async function translateWithGoogleWeb(text) {
 }
 
 // --- Subtitles Window Render and Autoscrolling ---
-function addSubtitlePlaceholder(teluguText = '') {
+function addSubtitlePlaceholder(teluguText = '', initialEnglish = '') {
     const lineId = 'line-' + Math.random().toString(36).substr(2, 9);
     
     const lineDiv = document.createElement('div');
     lineDiv.id = lineId;
     lineDiv.className = 'subtitle-line';
     
-    // Render Telugu text on top, and loading animation for English translation below
+    // Render Telugu text on top, and initial English text below (use loading dots only if no initial English is provided)
     lineDiv.innerHTML = `
         <div class="subtitle-telugu">${teluguText || '...'}</div>
-        <div class="subtitle-english"><span class="loading-dots">...</span></div>
+        <div class="subtitle-english">${initialEnglish || '<span class="loading-dots">...</span>'}</div>
     `;
     
     elements.subtitleList.appendChild(lineDiv);
