@@ -20,6 +20,7 @@ const state = {
     successfulGeminiModel: null,
     successfulGeminiVersion: null,
     lastProcessedResultIndex: -1,
+    isInterimActive: false,
     history: [], // Array of { timestamp: string, telugu: string, english: string }
     settings: {
         engine: 'gemini',
@@ -326,6 +327,8 @@ function initSpeechRecognition() {
         } else {
             updateListeningUI(false);
             stopSessionTimer();
+            state.isInterimActive = false;
+            removeInterimSubtitles();
         }
     };
     
@@ -354,6 +357,8 @@ function initSpeechRecognition() {
         
         const cleanFinal = finalTranscript.trim();
         if (cleanFinal.length > 0) {
+            state.isInterimActive = false; // Disable interim updates immediately as sentence is finalized
+            
             // Get the last known interim English text before removing it (to prevent screen blinking)
             const interimEnglish = document.querySelector('#interim-subtitle-line .subtitle-english')?.textContent || '';
             
@@ -369,16 +374,21 @@ function initSpeechRecognition() {
                 console.log('Buffered Telugu:', state.teluguBuffer);
             }
         }
- else {
+        else {
             const cleanInterim = interimTranscript.trim();
             if (cleanInterim.length > 0) {
+                state.isInterimActive = true; // Mark interim as active
+                
                 // Update Telugu immediately, but pass null for English to preserve the previous translation while generating
                 updateInterimSubtitles(cleanInterim, null);
                 translateInterim(cleanInterim, (translatedText) => {
-                    updateInterimSubtitles(cleanInterim, translatedText);
+                    if (state.isInterimActive) {
+                        updateInterimSubtitles(cleanInterim, translatedText);
+                    }
                 });
             }
         }
+
     };
     
     state.recognition = recognition;
@@ -447,6 +457,8 @@ function stopListening() {
     if (state.recognition) {
         state.recognition.stop();
     }
+    state.isInterimActive = false;
+    removeInterimSubtitles();
     updateListeningUI(false);
     stopSessionTimer();
     showToast('Subtitles stopped.', 'info');
