@@ -596,8 +596,8 @@ body {
 /* Custom scrolling list inside window */
 .subtitle-scroll-container {
     width: 100%;
-    height: calc(5 * 1.45em); /* Lock height to exactly 5 lines (5 * 1.45 line-height) */
-    max-height: calc(5 * 1.45em);
+    height: calc(8 * 1.45em); /* Lock height to exactly 8 lines (8 * 1.45 line-height) */
+    max-height: calc(8 * 1.45em);
     overflow-y: hidden; /* Auto scroll managed in JS, no visible scrollbars */
     display: flex;
     flex-direction: column;
@@ -650,19 +650,29 @@ body {
     opacity: 0.85;
 }
 .subtitle-line:nth-last-child(3) {
-    opacity: 0.7;
+    opacity: 0.75;
 }
 .subtitle-line:nth-last-child(4) {
-    opacity: 0.55;
+    opacity: 0.65;
 }
 .subtitle-line:nth-last-child(5) {
-    opacity: 0.4;
+    opacity: 0.55;
+}
+.subtitle-line:nth-last-child(6) {
+    opacity: 0.45;
+}
+.subtitle-line:nth-last-child(7) {
+    opacity: 0.35;
+}
+.subtitle-line:nth-last-child(8) {
+    opacity: 0.25;
 }
 
-/* Hide lines beyond the 5th line */
-.subtitle-line:nth-last-child(n+6) {
+/* Hide lines beyond the 8th line */
+.subtitle-line:nth-last-child(n+9) {
     display: none;
 }
+
 
 .subtitle-line.initial-tip {
     font-size: 1rem;

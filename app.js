@@ -995,20 +995,21 @@ function adjustFontSizeToFit() {
     const width = win.offsetWidth;
     const height = win.offsetHeight;
     
-    // 1. Calculate base size based on window width
-    // Width-based size gives readable scale as width expands/contracts
-    let calculatedSize = Math.max(14, Math.min(42, width / 24));
+    // 1. Calculate base size based on window width and height
+    // Allow the font to scale up when dragged vertically down (height increases) even if width is narrow
+    let calculatedSize = Math.max(18, Math.min(42, Math.max(width / 18, height / 14)));
     
     // 2. Adjust size based on available window height
     // Header height is roughly 42px. Padding is 2.5rem (40px). 
     // Remaining body height = height - 82px.
-    // 5 lines of subtitles at 1.45em height requires: 5 * 1.45 * fontSize = 7.25 * fontSize.
-    // So to avoid overflow height-wise, fontSize must be less than (height - 82) / 7.25
+    // 8 lines of subtitles at 1.45em height requires: 8 * 1.45 * fontSize = 11.6 * fontSize.
+    // So to avoid overflow height-wise, fontSize must be less than (height - 82) / 11.6
     const bodyAvailableHeight = height - 82;
-    const maxFontSizeFromHeight = Math.max(12, bodyAvailableHeight / 7.25);
+    const maxFontSizeFromHeight = Math.max(12, bodyAvailableHeight / 11.6);
     
     // Choose the smaller size to ensure the text fits both dimensions perfectly!
     calculatedSize = Math.min(calculatedSize, maxFontSizeFromHeight);
+
     
     // Apply styling to the subtitle container to allow em-based heights to scale
     elements.subtitleContainer.style.fontSize = `${calculatedSize}px`;
