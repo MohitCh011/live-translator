@@ -19,6 +19,7 @@ const state = {
     currentGeminiKeyIndex: 0,
     successfulGeminiModel: null,
     successfulGeminiVersion: null,
+    lastProcessedResultIndex: -1,
     history: [], // Array of { timestamp: string, telugu: string, english: string }
     settings: {
         engine: 'gemini',
@@ -331,16 +332,25 @@ function initSpeechRecognition() {
     recognition.onresult = (event) => {
         let finalTranscript = '';
         let interimTranscript = '';
+        let maxFinalIndex = state.lastProcessedResultIndex;
         
         // Loop through results
         for (let i = event.resultIndex; i < event.results.length; ++i) {
             const transcript = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
-                finalTranscript += transcript + ' ';
+                // Only process this final result if we haven't processed it yet!
+                if (i > state.lastProcessedResultIndex) {
+                    finalTranscript += transcript + ' ';
+                    if (i > maxFinalIndex) {
+                        maxFinalIndex = i;
+                    }
+                }
             } else {
                 interimTranscript += transcript;
             }
         }
+        
+        state.lastProcessedResultIndex = maxFinalIndex;
         
         const cleanFinal = finalTranscript.trim();
         if (cleanFinal.length > 0) {
@@ -390,6 +400,7 @@ function startListening() {
     if (!state.recognition) return;
     try {
         state.isListening = true; // Set active immediately to prevent double starts
+        state.lastProcessedResultIndex = -1; // Reset processed results tracking for new session
         state.recognition.lang = state.settings.sourceLang || 'te-IN'; // Apply current language preference
         state.recognition.start();
         
