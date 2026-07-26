@@ -596,8 +596,8 @@ body {
 /* Custom scrolling list inside window */
 .subtitle-scroll-container {
     width: 100%;
-    height: calc(5 * 1.45em); /* Lock height to exactly 5 lines (5 * 1.45 line-height) */
-    max-height: calc(5 * 1.45em);
+    height: calc(5 * 2.35em); /* Lock height to exactly 5 blocks of dual-line subtitles */
+    max-height: calc(5 * 2.35em);
     overflow-y: hidden; /* Auto scroll managed in JS, no visible scrollbars */
     display: flex;
     flex-direction: column;
@@ -615,16 +615,38 @@ body {
 
 .subtitle-line {
     font-family: var(--font-subs);
-    font-weight: 600;
-    color: var(--text-subtitles);
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.95), 0 0 2px rgba(0, 0, 0, 0.8);
     text-align: center;
-    line-height: 1.45;
-    word-wrap: break-word;
     font-size: 1em; /* Inherits dynamic size from container */
     opacity: 0.4;
     transition: opacity 0.3s, transform 0.3s;
     animation: subt-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0.25em 0;
+    box-sizing: border-box;
+    height: 2.35em; /* Guarantee constant height for each block to match container constraint */
+    justify-content: center;
+}
+
+.subtitle-telugu {
+    font-size: 0.8em;
+    font-weight: 500;
+    color: #00d4ff; /* Cyan color for Telugu speech input */
+    opacity: 0.9;
+    font-style: italic;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.1;
+}
+
+.subtitle-english {
+    font-size: 1em;
+    font-weight: 700;
+    color: #ffffff;
+    line-height: 1.2;
 }
 
 /* Make newer lines more opaque/focused */
@@ -659,6 +681,13 @@ body {
     text-align: center;
     font-family: var(--font-ui);
     animation: pulse-opacity 2s infinite;
+    height: auto;
+}
+
+.subtitle-line.interim-focused {
+    opacity: 0.95;
+    border-top: 1px dashed rgba(0, 212, 255, 0.15);
+    padding-top: 0.35em;
 }
 
 /* Resize handle styling override to look nicer */

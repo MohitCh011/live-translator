@@ -330,19 +330,47 @@ function initSpeechRecognition() {
     
     recognition.onresult = (event) => {
         let finalTranscript = '';
+        let interimTranscript = '';
         
         // Loop through results
         for (let i = event.resultIndex; i < event.results.length; ++i) {
+            const transcript = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
-                finalTranscript += event.results[i][0].transcript + ' ';
+                finalTranscript += transcript + ' ';
+            } else {
+                interimTranscript += transcript;
             }
         }
         
-        const cleanText = finalTranscript.trim();
-        if (cleanText.length > 0) {
-            // Append to buffer
-            state.teluguBuffer = (state.teluguBuffer + ' ' + cleanText).trim();
-            console.log('Buffered Telugu:', state.teluguBuffer);
+        const cleanFinal = finalTranscript.trim();
+        if (cleanFinal.length > 0) {
+            // Remove the temporary interim line from UI as final is ready
+            removeInterimSubtitles();
+            
+            // If delay is set to 2s, we bypass the buffering loop and translate immediately
+            if ((state.settings.translationDelay || 5) <= 2) {
+                handleFinalTeluguSentence(cleanFinal);
+            } else {
+                // Append to buffer to wait for sentence formation
+                state.teluguBuffer = (state.teluguBuffer + ' ' + cleanFinal).trim();
+                console.log('Buffered Telugu:', state.teluguBuffer);
+            }
+        } else {
+            const cleanInterim = interimTranscript.trim();
+            if (cleanInterim.length > 0) {
+                // We have active speech! Update interim subtitles
+                const engine = state.settings.engine;
+                if (engine === 'googleweb' || engine === 'local') {
+                    // Update Telugu immediately, translate English with a throttle
+                    updateInterimSubtitles(cleanInterim, '...');
+                    translateInterim(cleanInterim, (translatedText) => {
+                        updateInterimSubtitles(cleanInterim, translatedText);
+                    });
+                } else {
+                    // For Gemini/OpenAI, show the live Telugu text instantly, but avoid API key rate limits
+                    updateInterimSubtitles(cleanInterim, '...');
+                }
+            }
         }
     };
     
@@ -461,21 +489,21 @@ function stopSessionTimer() {
 async function handleFinalTeluguSentence(teluguText) {
     console.log('Received Telugu Speech:', teluguText);
     
-    // Show a loading indicator in the subtitles list
-    const tempLineId = addSubtitlePlaceholder();
+    // Show a loading indicator in the subtitles list with the Telugu text on top
+    const tempLineId = addSubtitlePlaceholder(teluguText);
     
     try {
         const translatedText = await translateTeluguToEnglish(teluguText, (progressText) => {
-            updateSubtitleLine(tempLineId, progressText);
+            updateSubtitleLine(tempLineId, progressText, teluguText);
         });
-        updateSubtitleLine(tempLineId, translatedText);
+        updateSubtitleLine(tempLineId, translatedText, teluguText);
         
         // Log into transcript history
         const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         logHistoryItem(timestamp, teluguText, translatedText);
     } catch (error) {
         console.error('Translation error:', error);
-        updateSubtitleLine(tempLineId, `[Translation Error: ${error.message}]`);
+        updateSubtitleLine(tempLineId, `[Translation Error: ${error.message}]`, teluguText);
     }
 }
 
@@ -819,15 +847,18 @@ async function translateWithGoogleWeb(text) {
 }
 
 // --- Subtitles Window Render and Autoscrolling ---
-function addSubtitlePlaceholder() {
+function addSubtitlePlaceholder(teluguText = '') {
     const lineId = 'line-' + Math.random().toString(36).substr(2, 9);
     
     const lineDiv = document.createElement('div');
     lineDiv.id = lineId;
     lineDiv.className = 'subtitle-line';
     
-    // A subtle loading animation inside subtitle window
-    lineDiv.innerHTML = `<span class="loading-dots">...</span>`;
+    // Render Telugu text on top, and loading animation for English translation below
+    lineDiv.innerHTML = `
+        <div class="subtitle-telugu">${teluguText || '...'}</div>
+        <div class="subtitle-english"><span class="loading-dots">...</span></div>
+    `;
     
     elements.subtitleList.appendChild(lineDiv);
     
@@ -842,10 +873,18 @@ function addSubtitlePlaceholder() {
     return lineId;
 }
 
-function updateSubtitleLine(lineId, text) {
+function updateSubtitleLine(lineId, englishText, teluguText = null) {
     const lineDiv = document.getElementById(lineId);
     if (lineDiv) {
-        lineDiv.textContent = text;
+        const teluguDiv = lineDiv.querySelector('.subtitle-telugu');
+        const englishDiv = lineDiv.querySelector('.subtitle-english');
+        
+        if (teluguText !== null && teluguDiv) {
+            teluguDiv.textContent = teluguText;
+        }
+        if (englishDiv) {
+            englishDiv.textContent = englishText;
+        }
         triggerAutoscroll();
         adjustFontSizeToFit();
     }
@@ -854,6 +893,74 @@ function updateSubtitleLine(lineId, text) {
 function triggerAutoscroll() {
     // Scroll the container all the way down so only the 5 most recent lines are visible
     elements.subtitleContainer.scrollTop = elements.subtitleContainer.scrollHeight;
+}
+
+let interimTranslationTimeout = null;
+let lastInterimTranslationTime = 0;
+
+function translateInterim(text, callback) {
+    const now = Date.now();
+    const delay = 350; // 350ms throttle to prevent API spam
+
+    if (interimTranslationTimeout) {
+        clearTimeout(interimTranslationTimeout);
+    }
+
+    const performTranslation = async () => {
+        lastInterimTranslationTime = Date.now();
+        try {
+            const translation = await translateTeluguToEnglish(text);
+            callback(translation);
+        } catch (e) {
+            console.error("Interim translation error:", e);
+        }
+    };
+
+    if (now - lastInterimTranslationTime >= delay) {
+        performTranslation();
+    } else {
+        interimTranslationTimeout = setTimeout(performTranslation, delay - (now - lastInterimTranslationTime));
+    }
+}
+
+function updateInterimSubtitles(teluguText, englishText) {
+    let interimDiv = document.getElementById('interim-subtitle-line');
+    
+    if (!interimDiv) {
+        interimDiv = document.createElement('div');
+        interimDiv.id = 'interim-subtitle-line';
+        interimDiv.className = 'subtitle-line interim-focused';
+        interimDiv.innerHTML = `
+            <div class="subtitle-telugu"></div>
+            <div class="subtitle-english"></div>
+        `;
+        elements.subtitleList.appendChild(interimDiv);
+    }
+    
+    const teluguDiv = interimDiv.querySelector('.subtitle-telugu');
+    const englishDiv = interimDiv.querySelector('.subtitle-english');
+    
+    if (teluguDiv) {
+        teluguDiv.textContent = teluguText ? `🎤 ${teluguText}` : '';
+    }
+    if (englishDiv) {
+        englishDiv.textContent = englishText ? `✍️ ${englishText}` : '';
+    }
+    
+    // Performance limit: Keep at most 12 elements in DOM to avoid bloating
+    while (elements.subtitleList.children.length > 12) {
+        elements.subtitleList.firstElementChild.remove();
+    }
+    
+    triggerAutoscroll();
+    adjustFontSizeToFit();
+}
+
+function removeInterimSubtitles() {
+    const interimDiv = document.getElementById('interim-subtitle-line');
+    if (interimDiv) {
+        interimDiv.remove();
+    }
 }
 
 // --- Responsive Text Sizing ("automatically adjust texts") ---
