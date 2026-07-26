@@ -623,10 +623,11 @@ body {
     animation: subt-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding: 0.25em 0;
+    gap: 4px;
+    padding: 0.35em 0;
     box-sizing: border-box;
-    height: 2.35em; /* Guarantee constant height for each block to match container constraint */
+    height: auto; /* Allow height to expand dynamically when sentences wrap */
+    min-height: 2.35em;
     justify-content: center;
 }
 

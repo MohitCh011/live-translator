@@ -974,10 +974,10 @@ function adjustFontSizeToFit() {
     // 2. Adjust size based on available window height
     // Header height is roughly 42px. Padding is 2.5rem (40px). 
     // Remaining body height = height - 82px.
-    // 5 lines at 1.4 line-height requires: 5 * 1.4 * fontSize = 7.0 * fontSize.
-    // So to avoid overflow height-wise, fontSize must be less than (height - 82) / 7.0
+    // 5 blocks of dual-line subtitles at 2.35em height requires: 5 * 2.35 * fontSize = 11.75 * fontSize.
+    // So to avoid overflow height-wise, fontSize must be less than (height - 82) / 11.75
     const bodyAvailableHeight = height - 82;
-    const maxFontSizeFromHeight = Math.max(12, bodyAvailableHeight / 7.0);
+    const maxFontSizeFromHeight = Math.max(12, bodyAvailableHeight / 11.75);
     
     // Choose the smaller size to ensure the text fits both dimensions perfectly!
     calculatedSize = Math.min(calculatedSize, maxFontSizeFromHeight);
