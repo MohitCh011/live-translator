@@ -610,7 +610,6 @@ body {
     flex-direction: column;
     gap: 0; /* Gaps are removed to make the height calculation exactly 5 lines */
     justify-content: flex-end;
-    transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .subtitle-line {
@@ -619,7 +618,7 @@ body {
     text-align: center;
     font-size: 1em; /* Inherits dynamic size from container */
     opacity: 0.4;
-    transition: opacity 0.3s, transform 0.3s;
+    transition: opacity 0.2s;
     animation: subt-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     display: flex;
     flex-direction: column;
@@ -1094,8 +1093,8 @@ body {
 }
 
 @keyframes subt-fade-in {
-    from { opacity: 0; transform: translateY(10px); }
-    to { /* specific opacities are applied via nth-last-child selectors */ }
+    from { opacity: 0; }
+    to { }
 }
 
 @keyframes fade-in-slide {
