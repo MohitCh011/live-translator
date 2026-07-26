@@ -937,10 +937,10 @@ function updateInterimSubtitles(teluguText, englishText) {
     const englishDiv = interimDiv.querySelector('.subtitle-english');
     
     if (teluguDiv) {
-        teluguDiv.textContent = teluguText ? `🎤 ${teluguText}` : '';
+        teluguDiv.textContent = teluguText || '';
     }
     if (englishDiv) {
-        englishDiv.textContent = englishText ? `✍️ ${englishText}` : '';
+        englishDiv.textContent = englishText || '';
     }
     
     // Performance limit: Keep at most 12 elements in DOM to avoid bloating

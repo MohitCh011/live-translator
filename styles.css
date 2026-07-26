@@ -679,8 +679,6 @@ body {
 
 .subtitle-line.interim-focused {
     opacity: 0.95;
-    border-top: 1px dashed rgba(0, 212, 255, 0.15);
-    padding-top: 0.35em;
 }
 
 /* Resize handle styling override to look nicer */
