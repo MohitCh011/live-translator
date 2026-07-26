@@ -368,8 +368,8 @@ function initSpeechRecognition() {
         } else {
             const cleanInterim = interimTranscript.trim();
             if (cleanInterim.length > 0) {
-                // Update Telugu immediately, translate English with a throttle
-                updateInterimSubtitles(cleanInterim, '...');
+                // Update Telugu immediately, but pass null for English to preserve the previous translation while generating
+                updateInterimSubtitles(cleanInterim, null);
                 translateInterim(cleanInterim, (translatedText) => {
                     updateInterimSubtitles(cleanInterim, translatedText);
                 });
@@ -950,8 +950,8 @@ function updateInterimSubtitles(teluguText, englishText) {
     if (teluguDiv) {
         teluguDiv.textContent = teluguText || '';
     }
-    if (englishDiv) {
-        englishDiv.textContent = englishText || '';
+    if (englishDiv && englishText !== undefined && englishText !== null) {
+        englishDiv.textContent = englishText;
     }
     
     // Performance limit: Keep at most 12 elements in DOM to avoid bloating
